@@ -130,18 +130,47 @@ details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:60
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.spinner{animation:none}}
-@media (max-width:640px){.brand h1{font-size:19px}.kpi .v{font-size:24px}.kpi.hero .v{font-size:32px}h2{font-size:22px}.datainfo{flex-basis:100%;order:3}}
+
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.finder{position:relative;flex:0 1 300px;min-width:0}
+.finder input{width:100%;min-width:0;padding:7px 10px;font-family:var(--f-mono);font-size:13px;background:var(--surface-2);border-color:transparent}
+.finder input:focus{background:var(--surface);border-color:var(--accent)}
+.sug{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 30px rgba(0,0,0,.14);z-index:8;max-height:360px;overflow:auto}
+.sug button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--ink);padding:8px 12px;border-bottom:1px solid var(--line)}
+.sug button:last-child{border-bottom:0}
+.sug button:hover,.sug button.on{background:var(--accent-soft)}
+.sug .w{font-family:var(--f-mono);font-size:13px;font-weight:500}
+.sug .s{display:block;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lookup-wrap{border-top:1px solid var(--line);background:var(--bg);max-height:calc(100vh - 140px);overflow:auto}
+.lookup{padding-block:14px 16px}
+.lk-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.lk-top h3{font-size:24px}
+.lk-big{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.lk-big>div{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;min-width:0}
+.lk-big .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.lk-big .v{font-family:var(--f-display);font-weight:600;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.lk-big .b .v{color:var(--good)} .lk-big .nb .v{color:var(--copper)}
+.splitbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--surface-2);margin:4px 0 12px}
+.splitbar i{display:block;height:100%}
+@media (max-width:640px){.finder{flex-basis:100%;order:4}.brand h1{font-size:19px}.kpi .v{font-size:24px}.kpi.hero .v{font-size:32px}h2{font-size:22px}.datainfo{flex-basis:100%;order:3}}
 </style>
 <header class="top">
   <div class="wrap">
     <div class="bar">
       <div class="brand"><span class="tick" aria-hidden="true"></span><h1>PC Production Tracker</h1></div>
       <div class="datainfo" id="datainfo">No workbook loaded</div>
+      <div class="finder" id="finder">
+        <label for="woFind" class="sr">Look up a work order</label>
+        <input type="search" id="woFind" placeholder="Look up WO #  ( / )" autocomplete="off" spellcheck="false" aria-controls="woSug" aria-autocomplete="list">
+        <div class="sug" id="woSug" role="listbox" hidden></div>
+      </div>
       <input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls" hidden>
+      <button class="btn" id="refreshBtn" type="button" title="Re-read the workbook after you refresh and save it in Excel">↻ Refresh</button>
       <button class="btn primary" id="uploadBtn" type="button">Upload workbook</button>
     </div>
     <nav class="tabs" id="tabs" aria-label="Views"></nav>
   </div>
+  <div class="lookup-wrap" id="lookupWrap" hidden><div class="wrap"><section class="lookup" id="lookup" aria-live="polite"></section></div></div>
 </header>
 <main class="wrap" id="main"><div class="empty"><span class="spinner"></span> Loading…</div></main>
 <div class="toast" id="toast" hidden></div>
@@ -476,6 +505,38 @@ var Core = (function () {
     };
   }
 
+  // Hours charged to a WO, split by the Billable? column. includeRollup adds earlier WO numbers.
+  function woHours(M, wo, includeRollup) {
+    wo = String(wo || '').trim(); var o = M.woMap[wo];
+    var set = includeRollup && o ? o.set : [wo];
+    var P = M.ds.pt, D = M.ds.dict, rows = rowsFor(M, set);
+    var r = { wo: wo, set: set, b: 0, n: 0, x: 0, tot: 0, prod: 0, first: null, last: null, tasks: {}, people: {}, byWO: {} };
+    rows.forEach(function (i) {
+      var h = P.h[i], t = D.t[P.t[i]] || '(no task)', p = D.p[P.n[i]], w = D.w[P.w[i]];
+      var T = r.tasks[t] || (r.tasks[t] = { task: t, b: 0, n: 0, x: 0 }), Q = r.people[p] || (r.people[p] = { name: p, b: 0, n: 0, x: 0 }), W = r.byWO[w] || (r.byWO[w] = { wo: w, b: 0, n: 0, x: 0 });
+      var k = P.b[i] === 1 ? 'b' : P.b[i] === 0 ? 'n' : 'x';
+      r[k] += h; T[k] += h; Q[k] += h; W[k] += h; r.tot += h; r.prod += P.p[i];
+      if (r.first == null || P.d[i] < r.first) r.first = P.d[i]; if (r.last == null || P.d[i] > r.last) r.last = P.d[i];
+    });
+    function list(obj) { return Object.keys(obj).map(function (k) { var v = obj[k]; v.tot = v.b + v.n + v.x; return v; }).sort(function (a, b) { return b.tot - a.tot; }); }
+    r.tasks = list(r.tasks); r.people = list(r.people); r.byWO = list(r.byWO); r.entries = rows.length;
+    r.eff = (r.b + r.n) ? r.b / (r.b + r.n) : null;
+    return r;
+  }
+  // WO numbers / descriptions matching a search
+  function woSearch(M, q, limit) {
+    q = String(q || '').trim().toLowerCase(); if (!q) return [];
+    var out = [], seen = {};
+    function add(wo, desc, des, score) { if (seen[wo]) return; seen[wo] = 1; out.push({ wo: wo, desc: desc || '', des: des || '', score: score }); }
+    M.wos.forEach(function (o) {
+      var w = o.wo.toLowerCase();
+      if (w === q) add(o.wo, o.desc, o.des, 0); else if (w.indexOf(q) === 0) add(o.wo, o.desc, o.des, 1);
+      else if (w.indexOf(q) > 0) add(o.wo, o.desc, o.des, 2); else if ((o.desc || '').toLowerCase().indexOf(q) >= 0) add(o.wo, o.desc, o.des, 3);
+    });
+    M.ds.dict.w.forEach(function (w) { if (w && !seen[w] && w.toLowerCase().indexOf(q) >= 0) add(w, w === OH ? 'Overhead' : w === TR ? 'Training' : '', '', w.toLowerCase() === q ? 0 : 2); });
+    return out.sort(function (a, b) { return a.score - b.score || a.wo.localeCompare(b.wo); }).slice(0, limit || 8);
+  }
+
   /* ---------- efficiency ---------- */
   // Billable = Billable & client Entergy, plus every TS New Hire hour. Non-billable = Not Billable & Entergy.
   function effAgg(M, rows) {
@@ -605,7 +666,7 @@ var Core = (function () {
   return {
     OH: OH, TR: TR, DEFAULTS: DEFAULTS, CATCH_ALL: CATCH_ALL, KEYWORDS: KEYWORDS, DESIGN_TASKS: DESIGN_TASKS,
     key: key, num: num, toDay: toDay, dow: dow, weekStart: weekStart, dayToISO: dayToISO, grade: grade, avg: avg,
-    parseWorkbook: parseWorkbook, buildModel: buildModel, settingsFrom: settingsFrom, woCompute: woCompute, woDetail: woDetail,
+    parseWorkbook: parseWorkbook, buildModel: buildModel, settingsFrom: settingsFrom, woCompute: woCompute, woDetail: woDetail, woHours: woHours, woSearch: woSearch,
     effAgg: effAgg, personRows: personRows, rangeRows: rangeRows, peopleInRange: peopleInRange, weeksBetween: weeksBetween,
     qcSummary: qcSummary, qcDesigners: qcDesigners, taskObs: taskObs, weeklyProduction: weeklyProduction, designerWeek: designerWeek,
     estimate: estimate, rampMult: rampMult, estDesign: estDesign, estRes: estRes, ancestors: ancestors, descendants: descendants, dataChecks: dataChecks
@@ -622,7 +683,7 @@ var VIEWS = [
   ['production', 'Production'], ['tasks', 'Task Time'], ['estimator', 'Hour Estimator'], ['data', 'Data Check'], ['settings', 'Settings']
 ];
 var App = {
-  ds: null, M: null, meta: null, saved: null, view: 'efficiency', sort: {},
+  lookup: null, ds: null, M: null, meta: null, saved: null, view: 'efficiency', sort: {},
   caps: { db: null, assets: null, user: null, downloads: null }, canEdit: false, uid: null,
   ui: { eff: {}, wo: {}, des: {}, qc: {}, prod: {}, tasks: {}, est: {}, data: {} }
 };
@@ -796,7 +857,8 @@ function renderInfo() {
   var who = m.uploaderName ? ' by ' + esc(m.uploaderName) : '';
   var when = m.uploadedAt ? new Date(m.uploadedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   var scope = m.local ? ' <span class="pill warn">this device only</span>' : '';
-  el.innerHTML = '<b>' + esc(m.fileName || App.ds.file || 'Workbook') + '</b> · ' + (when ? 'uploaded ' + esc(when) + who + ' · ' : '') + 'time logged through ' + fd(c.maxDay) + scope;
+  var saved = m.lastModified ? new Date(m.lastModified).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  el.innerHTML = '<b>' + esc(m.fileName || App.ds.file || 'Workbook') + '</b> · ' + (saved ? 'file saved ' + esc(saved) + ' · ' : when ? 'uploaded ' + esc(when) + who + ' · ' : '') + 'time logged through ' + fd(c.maxDay) + scope;
   el.title = el.textContent;
 }
 var renderQueued = false;
@@ -813,6 +875,7 @@ function render() {
   if (aid) { var n = document.getElementById(aid); if (n) { n.focus(); try { if (s0 != null) n.setSelectionRange(s0, s1); } catch (e) {} } }
   if (!render.nav) window.scrollTo(0, y); render.nav = false;
   lsSet('ui', App.ui); lsSet('sort', App.sort);
+  if (App.lookup) renderLookup();
 }
 function emptyState() {
   var canShare = !!App.caps.assets;
@@ -1294,7 +1357,9 @@ document.addEventListener('click', function (e) {
     return;
   }
   var act = t.getAttribute('data-act');
-  if (act === 'upload') $('#file').click();
+  if (act === 'upload') pickFile();
+  else if (act === 'lkClose') closeLookup();
+  else if (act === 'lkOpen') { var w = App.lookup.wo; closeLookup(); App.ui.wo.sel = w; App.ui.wo.person = ''; go('workorders'); }
   else if (act === 'csv') exportCSV(t.getAttribute('data-id'));
   else if (act === 'more') { App.ui['more_' + t.getAttribute('data-id')] = true; render(); }
   else if (act === 'bud') { App.ui.wo.bud = t.getAttribute('data-v'); render(); }
@@ -1327,7 +1392,89 @@ function onField(e) {
 document.addEventListener('change', function (e) { if (e.target.tagName === 'SELECT' || e.target.type === 'date') onField(e); else if (e.target.tagName === 'INPUT') onField(e); });
 document.addEventListener('input', function (e) { if (e.target.tagName === 'INPUT' && (e.target.type === 'search' || e.target.type === 'number')) onField(e); });
 window.addEventListener('hashchange', function () { var v = location.hash.slice(1); if (VIEW_FN[v]) { App.view = v; lsSet('view', v); render.nav = true; render(); window.scrollTo(0, 0); } });
-$('#uploadBtn').addEventListener('click', function () { $('#file').click(); });
+$('#uploadBtn').addEventListener('click', function () { pickFile(); });
+$('#refreshBtn').addEventListener('click', function () { refreshFile(); });
+
+/* ---------------- WO lookup (header search) ---------------- */
+var sugIx = -1, sugList = [];
+function showSug() {
+  var q = $('#woFind').value, box = $('#woSug');
+  if (!App.M || !q.trim()) { box.hidden = true; sugList = []; return; }
+  sugList = Core.woSearch(App.M, q, 8); sugIx = sugList.length ? 0 : -1;
+  if (!sugList.length) { box.innerHTML = '<div class="empty" style="padding:12px">No work order matches “' + esc(q) + '”.</div>'; box.hidden = false; return; }
+  box.innerHTML = sugList.map(function (r, i) { return '<button type="button" role="option" data-pick="' + esc(r.wo) + '"' + (i === sugIx ? ' class="on"' : '') + '><span class="w">' + esc(r.wo) + '</span>' + (r.des ? ' <span class="muted" style="font-size:12px">· ' + esc(r.des) + '</span>' : '') + '<span class="s">' + esc(r.desc || ' ') + '</span></button>'; }).join('');
+  box.hidden = false;
+}
+function openLookup(wo) {
+  App.lookup = { wo: wo, roll: App.lookup && App.lookup.wo === wo ? App.lookup.roll : true };
+  $('#woSug').hidden = true; $('#woFind').value = wo; renderLookup();
+}
+function closeLookup() { App.lookup = null; $('#lookupWrap').hidden = true; }
+function renderLookup() {
+  var L = App.lookup, wrap = $('#lookupWrap');
+  if (!L || !App.M) { wrap.hidden = true; return; }
+  var M = App.M, o = M.woMap[L.wo], hasRoll = o && o.set.length > 1;
+  var r = Core.woHours(M, L.wo, hasRoll && L.roll), own = hasRoll ? Core.woHours(M, L.wo, false) : r;
+  if (!r.entries && !o) { wrap.hidden = false; $('#lookup').innerHTML = '<div class="lk-top"><div><h3 class="mono">WO ' + esc(L.wo) + '</h3><p class="sub">No time has been charged to this work order in the loaded workbook.</p></div><button class="btn" data-act="lkClose" type="button">Close</button></div>'; return; }
+  var bw = r.tot ? r.b / r.tot * 100 : 0, nw = r.tot ? r.n / r.tot * 100 : 0, xw = r.tot ? r.x / r.tot * 100 : 0;
+  var h = '<div class="lk-top"><div><h3 class="mono">WO ' + esc(L.wo) + '</h3><p class="sub">' + esc(o ? [o.desc, o.des, o.st].filter(Boolean).join(' · ') : (L.wo === Core.OH ? 'Overhead' : L.wo === Core.TR ? 'Training' : '')) +
+    (r.first != null ? ' · charged ' + fd(r.first) + ' – ' + fd(r.last) : '') + '</p></div><div class="row">' +
+    (o ? '<button class="btn" data-act="lkOpen" type="button">Full details</button>' : '') + '<button class="btn" data-act="lkClose" type="button">Close</button></div></div>';
+  if (hasRoll) h += '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:10px"><input type="checkbox" id="lkRoll"' + (L.roll ? ' checked' : '') + '> Include earlier WO number' + (o.set.length > 2 ? 's' : '') + ' (' + o.set.slice(1).map(esc).join(', ') + ')</label>';
+  h += '<div class="lk-big"><div class="b"><div class="l">Billable hrs</div><div class="v">' + fh(r.b) + '</div></div><div class="nb"><div class="l">Non-billable hrs</div><div class="v">' + fh(r.n) + '</div></div>' +
+    '<div><div class="l">Total hrs charged</div><div class="v">' + fh(r.tot) + '</div></div><div><div class="l">Billable share</div><div class="v">' + pct(r.eff) + '</div></div>' +
+    (r.x ? '<div><div class="l">Blank Billable? hrs</div><div class="v" style="color:var(--bad)">' + fh(r.x) + '</div></div>' : '') + '</div>';
+  h += '<div class="splitbar" title="Billable ' + fh(r.b) + ' · Non-billable ' + fh(r.n) + '"><i style="width:' + bw + '%;background:var(--good)"></i><i style="width:' + nw + '%;background:var(--copper)"></i><i style="width:' + xw + '%;background:var(--bad)"></i></div>';
+  var cols = [{ k: 'task', l: 'Task' }, { k: 'b', l: 'Billable', n: 1, f: function (x) { return fh(x.b); } }, { k: 'n', l: 'Non-billable', n: 1, f: function (x) { return fh(x.n); } }, { k: 'tot', l: 'Total', n: 1, f: function (x) { return fh(x.tot); } }];
+  var pcols = [{ k: 'name', l: 'Person' }, { k: 'b', l: 'Billable', n: 1, f: function (x) { return fh(x.b); } }, { k: 'n', l: 'Non-billable', n: 1, f: function (x) { return fh(x.n); } }, { k: 'tot', l: 'Total', n: 1, f: function (x) { return fh(x.tot); } }];
+  var foot = ['Total', fh(r.b), fh(r.n), fh(r.tot)];
+  h += '<div class="grid2"><div>' + table('lktask', cols, r.tasks, { foot: foot, sort: { k: 'tot', asc: false }, csv: 'wo-' + L.wo + '-hours-by-task' }) + '</div><div>' + table('lkpeople', pcols, r.people, { foot: foot, sort: { k: 'tot', asc: false }, csv: 'wo-' + L.wo + '-hours-by-person' }) + '</div></div>';
+  if (hasRoll && L.roll) h += '<p class="sub" style="margin-top:8px">This WO number alone: ' + fh(own.b) + ' billable, ' + fh(own.n) + ' non-billable, ' + fh(own.tot) + ' total.</p>';
+  h += '<div class="row" style="margin-top:10px">' + csvBtn('lktask') + '</div>';
+  $('#lookup').innerHTML = h; wrap.hidden = false;
+}
+$('#woFind').addEventListener('input', showSug);
+$('#woFind').addEventListener('focus', function () { if (this.value) showSug(); });
+$('#woFind').addEventListener('keydown', function (e) {
+  var box = $('#woSug');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!sugList.length) return; e.preventDefault(); sugIx = (sugIx + (e.key === 'ArrowDown' ? 1 : -1) + sugList.length) % sugList.length; box.querySelectorAll('button').forEach(function (b, i) { b.classList.toggle('on', i === sugIx); }); }
+  else if (e.key === 'Enter') { e.preventDefault(); var q = this.value.trim(); if (!q || !App.M) return; var pick = sugIx >= 0 && sugList[sugIx] ? sugList[sugIx].wo : q; openLookup(pick); this.blur(); }
+  else if (e.key === 'Escape') { box.hidden = true; if (!this.value) closeLookup(); }
+});
+document.addEventListener('mousedown', function (e) { if (!e.target.closest('#finder')) $('#woSug').hidden = true; });
+$('#woSug').addEventListener('click', function (e) { var b = e.target.closest('[data-pick]'); if (b) openLookup(b.getAttribute('data-pick')); });
+document.addEventListener('keydown', function (e) { if (e.key === '/' && !/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) { e.preventDefault(); $('#woFind').focus(); } else if (e.key === 'Escape' && App.lookup && document.activeElement !== $('#woFind')) closeLookup(); });
+$('#lookupWrap').addEventListener('change', function (e) { if (e.target.id === 'lkRoll') { App.lookup.roll = e.target.checked; renderLookup(); } });
+
+/* ---------------- picking and refreshing the workbook file ---------------- */
+var canPick = typeof window.showOpenFilePicker === 'function';
+var PICK_OPTS = { types: [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm'], 'application/vnd.ms-excel.sheet.binary.macroEnabled.12': ['.xlsb'] } }], multiple: false };
+function handleGet() { return idb('readonly', function (st) { return st.get('handle'); }); }
+function handleSet(h) { return idb('readwrite', function (st) { st.put(h, 'handle'); }); }
+function pickFile() {
+  if (!canPick) { $('#file').click(); return; }
+  window.showOpenFilePicker(PICK_OPTS).then(function (hs) { var h = hs[0]; handleSet(h); return h.getFile(); }).then(function (f) { handleFile(f); })
+    .catch(function (e) { if (e && e.name === 'AbortError') return; canPick = false; $('#file').click(); });
+}
+function refreshFile() {
+  if (!canPick) { toast('Pick the saved workbook again to reload it.', 4000); $('#file').click(); return; }
+  handleGet().then(function (h) {
+    if (!h) { toast('Pick the workbook once; after that Refresh re-reads it with one click.', 5000); pickFile(); return; }
+    var perm = h.queryPermission ? h.queryPermission({ mode: 'read' }) : Promise.resolve('granted');
+    return perm.then(function (p) { return p === 'granted' ? p : h.requestPermission({ mode: 'read' }); }).then(function (p) {
+      if (p !== 'granted') { toast('The browser needs permission to read the workbook. Click Refresh again and choose Allow.', 6000); return; }
+      return h.getFile().then(function (f) {
+        var prev = App.meta && App.meta.lastModified;
+        if (prev && f.lastModified === prev) { toast('No changes since the last load. In Excel: Data → Refresh All, wait for it to finish, then Save. Then click Refresh here.', 8000); return; }
+        handleFile(f);
+      });
+    });
+  }).catch(function (e) {
+    console.error(e);
+    toast(e && e.name === 'NotFoundError' ? 'The workbook was moved or renamed. Pick it again.' : e && e.name === 'NotReadableError' ? 'The file is busy. Let Excel finish saving, then click Refresh again.' : 'Could not re-read the workbook. Pick it again.', 7000);
+    if (e && e.name === 'NotFoundError') pickFile();
+  });
+}
 $('#file').addEventListener('change', function () { var f = this.files[0]; this.value = ''; if (f) handleFile(f); });
 
 /* ---------------- data loading, sharing, caching ---------------- */
@@ -1358,9 +1505,11 @@ function handleFile(file) {
       var ds;
       try { ds = Core.parseWorkbook(XLSX, new Uint8Array(fr.result), file.name); }
       catch (e) { console.error(e); toast(e.message || 'That file could not be read as a workbook.', 8000); return; }
-      var meta = { fileName: file.name, uploadedAt: new Date().toISOString(), uploadedBy: App.uid || null, local: true, maxDay: ds.counts.maxDay, entries: ds.counts.entries };
+      var meta = { fileName: file.name, lastModified: file.lastModified || null, uploadedAt: new Date().toISOString(), uploadedBy: App.uid || null, local: true, maxDay: ds.counts.maxDay, entries: ds.counts.entries };
+      var before = App.ds ? App.ds.counts : null;
       useDataset(ds, meta);
       cacheSet({ ds: ds, meta: meta });
+      if (before && (!App.caps.assets || !App.canEdit)) { var add = ds.counts.entries - before.entries; toast('Refreshed. ' + (add > 0 ? add.toLocaleString() + ' new entries · ' : add < 0 ? Math.abs(add).toLocaleString() + ' fewer entries · ' : 'Same number of entries · ') + 'time logged through ' + fd(ds.counts.maxDay) + '.', 6000); return; }
       shareDataset(ds, meta);
     }, 30);
   };
