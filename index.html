@@ -1,0 +1,1456 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}</style></head><body>
+<title>PC Production Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky header + tab rail, then one working canvas per view; tables scroll inside their own frames. */
+:root{
+  --bg:#F1F2EE; --surface:#FFFFFF; --surface-2:#E7E9E3; --ink:#17202A; --muted:#5A6570; --line:#D3D7CE;
+  --accent:#1C6680; --accent-soft:#D6E8EE; --on-accent:#FFFFFF; --copper:#A85A22;
+  --good:#2A7346; --good-soft:#D8EEDF; --warn:#946600; --warn-soft:#F5E8C4; --bad:#AE3624; --bad-soft:#F6DCD6;
+  --h0:#F3E0DA; --h1:#F2EBCF; --h2:#DCEBD9; --h3:#B9DCC3; --h4:#8CC6A0;
+  --f-display:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1419; --surface:#161D24; --surface-2:#1E2730; --ink:#E4E9EE; --muted:#93A0AC; --line:#2A3540;
+  --accent:#5AB0CF; --accent-soft:#16323D; --on-accent:#08141A; --copper:#E0915A;
+  --good:#5BC283; --good-soft:#163222; --warn:#E2B544; --warn-soft:#352B10; --bad:#F08069; --bad-soft:#3A1A14;
+  --h0:#3A1D17; --h1:#332B12; --h2:#1A3122; --h3:#1F4A2E; --h4:#2B6B41; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1419; --surface:#161D24; --surface-2:#1E2730; --ink:#E4E9EE; --muted:#93A0AC; --line:#2A3540;
+  --accent:#5AB0CF; --accent-soft:#16323D; --on-accent:#08141A; --copper:#E0915A;
+  --good:#5BC283; --good-soft:#163222; --warn:#E2B544; --warn-soft:#352B10; --bad:#F08069; --bad-soft:#3A1A14;
+  --h0:#3A1D17; --h1:#332B12; --h2:#1A3122; --h3:#1F4A2E; --h4:#2B6B41; color-scheme:dark}
+*{box-sizing:border-box}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));max-width:1440px;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.01em;margin:0;white-space:nowrap}
+.brand .tick{width:10px;height:10px;background:var(--copper);display:inline-block;transform:rotate(45deg);margin-right:2px}
+.datainfo{font-size:12px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.datainfo b{color:var(--ink);font-weight:600}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;padding-bottom:0}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs a{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.02em;color:var(--muted);text-decoration:none;padding:8px 12px 9px;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs a:hover{color:var(--ink)}
+nav.tabs a.on{color:var(--ink);border-bottom-color:var(--accent)}
+main{padding-block:20px 60px}
+h2{font-family:var(--f-display);font-weight:700;font-size:26px;margin:0;text-wrap:balance}
+h3{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0;letter-spacing:.01em}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 0;max-width:75ch}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.stack{display:flex;flex-direction:column;gap:18px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.grid2>*{min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.panel-h{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+select,input[type=text],input[type=number],input[type=date],input[type=search]{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0;max-width:100%}
+input[type=search]{min-width:min(260px,100%)}
+select:focus,input:focus,button:focus-visible,a:focus-visible,tr[data-go]:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button{font:inherit;cursor:pointer}
+.btn{font-family:var(--f-body);font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px 12px;border-radius:4px;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{filter:brightness(1.08);color:var(--on-accent)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--accent);padding-inline:6px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.kpi{background:var(--surface);padding:12px 14px;min-width:0}
+.kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.kpi .v{font-family:var(--f-display);font-weight:600;font-size:28px;line-height:1.1;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi.hero .v{font-size:40px;color:var(--accent)}
+.up{color:var(--good)} .down{color:var(--bad)}
+.tbl-wrap{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.tbl-wrap.tall{max-height:640px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{position:sticky;top:0;background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;z-index:1;cursor:default;user-select:none}
+th[data-sort]{cursor:pointer}
+th[data-sort]:hover{color:var(--ink)}
+th.sorted::after{content:" ▾";color:var(--accent)} th.sorted.asc::after{content:" ▴"}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:12.5px}
+td.wrap{white-space:normal;min-width:220px;max-width:420px}
+tr[data-go]{cursor:pointer}
+tbody tr:hover td{background:var(--surface-2)}
+tfoot td{font-weight:600;background:var(--surface-2);position:sticky;bottom:0}
+.mono{font-family:var(--f-mono);font-size:12.5px}
+.muted{color:var(--muted)}
+.pill{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--surface-2);color:var(--muted)}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.acc{background:var(--accent-soft);color:var(--accent)}
+.grade{font-family:var(--f-display);font-weight:700;font-size:15px;display:inline-block;min-width:28px;text-align:center;padding:1px 6px;border-radius:4px}
+.meter{position:relative;height:8px;background:var(--surface-2);border-radius:4px;min-width:90px;overflow:visible}
+.meter>i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--accent)}
+.meter>b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink);opacity:.45}
+.mcell{display:flex;align-items:center;gap:8px;min-width:150px}
+.mcell .meter{flex:1}
+.mcell span{font-family:var(--f-mono);font-size:12.5px;min-width:46px;text-align:right}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:500;color:var(--ink);display:inline-flex;gap:6px;align-items:center}
+.chip b{font-family:var(--f-mono);font-weight:500}
+.chip.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.heat td.h{text-align:center;font-family:var(--f-mono);font-size:12px;padding:6px 4px;min-width:52px;color:var(--ink)}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-body);font-size:11px}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:3px;display:inline-block;border-radius:2px}
+.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px 18px}
+.dl div{min-width:0}
+.dl dt{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.dl dd{margin:2px 0 0;font-size:15px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.crumbs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-family:var(--f-mono);font-size:13px}
+.crumbs .arrow{color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:40px 24px;text-align:center;background:var(--surface);max-width:720px;margin:40px auto}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop h2{margin-bottom:8px}
+.drop p{color:var(--muted);max-width:56ch;margin:6px auto 18px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-size:13px;z-index:20;max-width:calc(100% - 32px);box-shadow:0 6px 24px rgba(0,0,0,.2)}
+.note{font-size:12.5px;color:var(--muted);background:var(--surface-2);border-radius:4px;padding:8px 10px;max-width:90ch}
+.split{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+.flag{font-size:11px;font-weight:600;color:var(--bad)}
+.kw input{width:100%}
+.check-n{font-family:var(--f-display);font-weight:700;font-size:26px;min-width:56px;text-align:right}
+details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:600}
+.list-inline{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7;overflow-wrap:anywhere}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spinner{animation:none}}
+@media (max-width:640px){.brand h1{font-size:19px}.kpi .v{font-size:24px}.kpi.hero .v{font-size:32px}h2{font-size:22px}.datainfo{flex-basis:100%;order:3}}
+</style>
+<header class="top">
+  <div class="wrap">
+    <div class="bar">
+      <div class="brand"><span class="tick" aria-hidden="true"></span><h1>PC Production Tracker</h1></div>
+      <div class="datainfo" id="datainfo">No workbook loaded</div>
+      <input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls" hidden>
+      <button class="btn primary" id="uploadBtn" type="button">Upload workbook</button>
+    </div>
+    <nav class="tabs" id="tabs" aria-label="Views"></nav>
+  </div>
+</header>
+<main class="wrap" id="main"><div class="empty"><span class="spinner"></span> Loading…</div></main>
+<div class="toast" id="toast" hidden></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script id="core">
+/* ===== Core: workbook parsing + every calculation. Pure functions, no DOM. ===== */
+var Core = (function () {
+  'use strict';
+  var OH = '00000000', TR = '00000001';
+  var DESIGN_TASKS = ['pole foreman', 'gdt', 'maximo/deliverables', 'delivered to tech review', 'other (explain in notes.)',
+    'support', 'qaqc corrections', 'pf corrections', 'gdt corrections', 'max/del corrections'];
+  var CATCH_ALL = ['Other', 'Other (Explain in notes.)', 'Multiple (See Notes)', 'Research (Add Note)', 'Permit (Explain in Notes)', 'Entergy Training (Add Note)'];
+  var KEYWORDS = ['GDT', 'Pole Foreman', 'Photos', 'Vicinity Map', 'Maximo', 'Deliverable', 'Permit', 'Meeting', 'Training', 'Login', 'Setup', 'Sketch', 'JHA', 'Environmental', 'Corrections'];
+  var DEFAULTS = {
+    rates: { PF: [1, 0.75], GDT: [1, 0.75], Corrections: [0.75, 0.25], 'Max/Del': [3, 0.5], QC: [2, 0.75], PC: [1, 0.2], PM: [1, 0.2] },
+    ramp: [[0, 3], [38, 2.5], [45, 2], [52, 1.5], [73, 1]],
+    thresh: { near: 0.85, over: 1 },
+    rollup: 'original',
+    effTarget: 0.75,
+    prodStart: 20535 // 2026-03-23
+  };
+  var DESIGN_RATE_KEYS = ['PF', 'GDT', 'Corrections', 'Max/Del'];
+
+  /* ---------- small helpers ---------- */
+  function key(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
+  function hkey(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function str(v) { return v == null ? '' : String(v).trim(); }
+  function num(v) { if (v == null || v === '') return null; var n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[,$%]/g, '')); return isFinite(n) ? n : null; }
+  function normWO(v) {
+    if (v == null || v === '') return '';
+    if (typeof v === 'number') { var s = String(Math.round(v)); if (v >= 0 && v <= 1) s = s.padStart(8, '0'); return s; }
+    return String(v).trim();
+  }
+  function toDay(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return v > 1000 ? Math.floor(v) - 25569 : null;
+    if (v instanceof Date) return Math.floor(Date.UTC(v.getFullYear(), v.getMonth(), v.getDate()) / 864e5);
+    var s = String(v).trim(), m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) { var y = +m[3]; if (y < 100) y += 2000; return Math.floor(Date.UTC(y, +m[1] - 1, +m[2]) / 864e5); }
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5);
+    return null;
+  }
+  function dow(day) { return (day + 3) % 7; } // 0 = Monday
+  function weekStart(day) { return day - dow(day); }
+  function dayToISO(d) { return d == null ? '' : new Date(d * 864e5).toISOString().slice(0, 10); }
+  function grade(s) {
+    if (s == null || s === '' || isNaN(s)) return '';
+    return s >= .95 ? 'A+' : s >= .9 ? 'A' : s >= .85 ? 'A-' : s >= .8 ? 'B+' : s >= .75 ? 'B' : s >= .7 ? 'B-' : s >= .65 ? 'C+' : s >= .6 ? 'C' : s >= .55 ? 'C-' : s >= .5 ? 'D' : 'F';
+  }
+  function avg(a) { var s = 0, n = 0; for (var i = 0; i < a.length; i++) if (a[i] != null && !isNaN(a[i])) { s += a[i]; n++; } return n ? s / n : null; }
+
+  /* ---------- parsing ---------- */
+  function sheetRows(XLSX, ws) { return XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true }); }
+
+  // Find a table anywhere in the workbook by the headers it must carry.
+  function findTable(XLSX, wb, required, preferName, cache) {
+    var names = wb.SheetNames.slice();
+    if (preferName) names.sort(function (a, b) { return (hkey(b) === hkey(preferName)) - (hkey(a) === hkey(preferName)); });
+    for (var i = 0; i < names.length; i++) {
+      var rows = cache[names[i]] || (cache[names[i]] = sheetRows(XLSX, wb.Sheets[names[i]]));
+      for (var r = 0; r < Math.min(6, rows.length); r++) {
+        var hdr = (rows[r] || []).map(hkey);
+        var ok = required.every(function (h) { return hdr.indexOf(h) >= 0; });
+        if (ok) {
+          var col = {}; hdr.forEach(function (h, ci) { if (h && !(h in col)) col[h] = ci; });
+          return { sheet: names[i], rows: rows.slice(r + 1), col: col };
+        }
+      }
+    }
+    return null;
+  }
+
+  function parseWorkbook(XLSX, data, fileName) {
+    var wb = XLSX.read(data, { type: 'array', cellDates: false, cellFormula: false, cellHTML: false, cellStyles: false });
+    var cache = {}, warn = [];
+    var ds = { v: 1, file: fileName || '', parsedAt: new Date().toISOString(), dict: { p: [], w: [], t: [], c: [], s: [] } };
+    var dIdx = { p: {}, w: {}, t: {}, c: {}, s: {} };
+    function intern(k, v) { if (!(v in dIdx[k])) { dIdx[k][v] = ds.dict[k].length; ds.dict[k].push(v); } return dIdx[k][v]; }
+
+    // Production Tracker
+    var pt = findTable(XLSX, wb, ['date', 'name', 'workorder', 'hours', 'wotask', 'billable'], 'Production Tracker', cache);
+    if (!pt) throw new Error('Could not find the Production Tracker sheet (needs Date, Name, WorkOrder, Hours, WOTask and Billable? columns).');
+    var c = pt.col, recs = [];
+    pt.rows.forEach(function (r) {
+      if (!r) return;
+      var d = toDay(r[c.date]); var nm = str(r[c.name]);
+      if (d == null || !nm) return;
+      var b = key(r[c.billable]);
+      recs.push([d, intern('p', nm), intern('w', normWO(r[c.workorder])), num(r[c.production]) || 0, num(r[c.hours]) || 0,
+        intern('s', str(r[c.status])), intern('t', str(r[c.wotask])), intern('c', str(r[c.client])),
+        b === 'billable' ? 1 : b === 'not billable' ? 0 : -1, str(r[c.notes])]);
+    });
+    recs.sort(function (a, b) { return a[0] - b[0]; });
+    var P = ds.pt = { d: [], n: [], w: [], p: [], h: [], s: [], t: [], c: [], b: [], notes: {} };
+    recs.forEach(function (x, i) {
+      P.d.push(x[0]); P.n.push(x[1]); P.w.push(x[2]); P.p.push(x[3]); P.h.push(x[4]); P.s.push(x[5]); P.t.push(x[6]); P.c.push(x[7]); P.b.push(x[8]);
+      if (x[9]) P.notes[i] = x[9];
+    });
+
+    // WO Hours (work order register)
+    var wh = findTable(XLSX, wb, ['program', 'workorder', 'workpointcount', 'designer', 'status', 'originalwo'], 'WO Hours', cache);
+    ds.woh = [];
+    if (wh) {
+      c = wh.col;
+      wh.rows.forEach(function (r) {
+        if (!r) return; var wo = normWO(r[c.workorder]); if (!wo) return;
+        ds.woh.push({ prog: str(r[c.program]), grp: str(r[c.projectgroup]), wo: wo, desc: str(r[c.wodescription]), wp: num(r[c.workpointcount]),
+          des: str(r[c.designer]).replace(/[\x00-\x1f]/g, ''), st: str(r[c.status]), cost: num(r[c.totalcostestimate]), mh: num(r[c.manhours]),
+          orig: normWO(r[c.originalwo]), tsd: toDay(r[c.targetstartdate]) });
+      });
+    } else warn.push('No WO Hours sheet found; work order budgets will use Project Tracker only.');
+
+    // Project Tracker
+    var pr = findTable(XLSX, wb, ['designer', 'workorder', 'wodescription', 'workpointcount', 'senttoqaqc'], 'Project Tracker', cache);
+    ds.proj = [];
+    if (pr) {
+      c = pr.col;
+      pr.rows.forEach(function (r) {
+        if (!r) return; var wo = normWO(r[c.workorder]); if (!wo) return;
+        ds.proj.push({ wo: wo, des: str(r[c.designer]), desc: str(r[c.wodescription]), wp: num(r[c.workpointcount]), sent: toDay(r[c.senttoqaqc]) , qa: str(r[c.qaqc]), st: str(r[c.status]), tsd: toDay(r[c.targetstartdate]) });
+      });
+    }
+
+    // WO Number Tracker (re-numbered work orders)
+    var fm = findTable(XLSX, wb, ['newwo', 'oldwo'], 'WO Number Tracker', cache);
+    ds.fam = [];
+    if (fm) { c = fm.col; fm.rows.forEach(function (r) { if (!r) return; var n = normWO(r[c.newwo]), o = normWO(r[c.oldwo]); if (n && o && n !== o) ds.fam.push([n, o, str(r[c.reasonforchange])]); }); }
+
+    // QC Scorecard
+    var sc = findTable(XLSX, wb, ['designer', 'qctechnician', 'overallscore', 'workorder'], 'Scorecard', cache);
+    ds.sc = [];
+    if (sc) {
+      c = sc.col;
+      sc.rows.forEach(function (r) {
+        if (!r) return; var d = str(r[c.designer]); if (!d) return;
+        ds.sc.push({ des: d, d: toDay(r[c.date]), tech: str(r[c.qctechnician]), wo: normWO(r[c.workorder]), ver: num(r[c.version]),
+          pf: num(r[c.poleforemanscore]), gdt: num(r[c.gdtscore]), del: num(r[c.deliverablescore]), ov: num(r[c.overallscore]), pts: num(r[c.affectedpoints]) });
+      });
+    } else warn.push('No Scorecard sheet found; QC views will be empty.');
+
+    // Employee List (only the fields the app needs; birthdays and schooling are left out)
+    var em = findTable(XLSX, wb, ['employeename', 'location', 'startdate'], 'Employee List', cache);
+    ds.emp = [];
+    if (em) {
+      c = em.col;
+      em.rows.forEach(function (r) {
+        if (!r) return; var n = str(r[c.employeename]); if (!n) return;
+        ds.emp.push({ name: n, rep: str(r[c.reportsto]), proj: str(r[c.project]), start: toDay(r[c.startdate]), task: str(r[c.task]), loc: str(r[c.location]) });
+      });
+    } else warn.push('No Employee List sheet found; locations and start dates will be blank.');
+
+    // Estimator rates, ramp and budget thresholds (fall back to defaults)
+    ds.cfg = {};
+    var estName = wb.SheetNames.filter(function (n) { return hkey(n) === 'wohrestimator'; })[0];
+    if (estName) {
+      var er = cache[estName] || sheetRows(XLSX, wb.Sheets[estName]), rates = {};
+      for (var i = 0; i < Math.min(15, er.length); i++) {
+        var row = er[i] || [], res = key(row[0]), task = str(row[1]);
+        if (['designer', 'qc', 'pc', 'pm'].indexOf(res) >= 0 && num(row[2]) != null && num(row[3]) != null) {
+          var k = res === 'designer' ? ({ pf: 'PF', gdt: 'GDT', corrections: 'Corrections', 'max/del': 'Max/Del' })[key(task)] : res.toUpperCase();
+          if (k) rates[k] = [num(row[2]), num(row[3])];
+        }
+      }
+      if (Object.keys(rates).length >= 4) ds.cfg.rates = rates;
+      // Ramp table: header "Ramp Start Day" then 5 rows of [start, multiplier]
+      for (i = 0; i < er.length; i++) {
+        var rw = er[i] || [], ci = rw.findIndex(function (v) { return hkey(v) === 'rampstartday'; });
+        if (ci >= 0) {
+          var ramp = [];
+          for (var j = 1; j <= 8; j++) { var q = er[i + j] || []; if (num(q[ci]) != null && num(q[ci + 1]) != null) ramp.push([num(q[ci]), num(q[ci + 1])]); else break; }
+          if (ramp.length) ds.cfg.ramp = ramp;
+          break;
+        }
+      }
+    }
+    var lkName = wb.SheetNames.filter(function (n) { return hkey(n) === 'esthourslookup'; })[0];
+    if (lkName) {
+      var lr = sheetRows(XLSX, wb.Sheets[lkName]), th = {};
+      lr.forEach(function (r) { if (!r) return; var t = String(r[0] || ''); if (/near budget/i.test(t) && num(r[1]) != null) th.near = num(r[1]); if (/over budget/i.test(t) && num(r[1]) != null) th.over = num(r[1]); });
+      if (th.near != null && th.over != null) ds.cfg.thresh = th;
+    }
+    ds.warn = warn;
+    ds.counts = { entries: P.d.length, wos: ds.woh.length, scorecards: ds.sc.length, employees: ds.emp.length, minDay: P.d[0], maxDay: P.d[P.d.length - 1] };
+    return ds;
+  }
+
+  /* ---------- model ---------- */
+  function settingsFrom(ds, saved) {
+    var s = JSON.parse(JSON.stringify(DEFAULTS));
+    if (ds && ds.cfg) { if (ds.cfg.rates) s.rates = ds.cfg.rates; if (ds.cfg.ramp) s.ramp = ds.cfg.ramp; if (ds.cfg.thresh) s.thresh = ds.cfg.thresh; }
+    if (saved) Object.keys(saved).forEach(function (k) { if (saved[k] != null && k in DEFAULTS) s[k] = saved[k]; });
+    return s;
+  }
+
+  function buildModel(ds, saved) {
+    var S = settingsFrom(ds, saved), P = ds.pt, D = ds.dict, N = P.d.length, i;
+    var M = { ds: ds, S: S, N: N };
+    // Lower-cased lookups for SUMIFS-style (case-insensitive) matching
+    var tkey = D.t.map(key), ckey = D.c.map(key), wkey = D.w.map(function (w) { return w.trim(); });
+    M.tkey = tkey; M.ckey = ckey;
+    var isOH = D.w.map(function (w) { return w === OH; }), isTR = D.w.map(function (w) { return w === TR; });
+    var isDesignTask = tkey.map(function (t) { return DESIGN_TASKS.indexOf(t) >= 0; });
+    var cEnt = ckey.map(function (c) { return c === 'entergy'; }), cNew = ckey.map(function (c) { return c === 'ts new hire'; });
+    M.isOH = isOH; M.isTR = isTR; M.cEnt = cEnt; M.cNew = cNew; M.isDesignTask = isDesignTask;
+
+    // per-row derived
+    var prodHrs = new Float64Array(N), billHrs = new Float64Array(N);
+    for (i = 0; i < N; i++) { var w = P.w[i]; prodHrs[i] = (isOH[w] || isTR[w]) ? 0 : P.h[i]; billHrs[i] = P.b[i] === 0 ? 0 : prodHrs[i]; }
+    M.billHrs = billHrs; M.prodHrs = prodHrs;
+
+    // indexes
+    var byW = {}, byP = {};
+    for (i = 0; i < N; i++) { (byW[P.w[i]] || (byW[P.w[i]] = [])).push(i); (byP[P.n[i]] || (byP[P.n[i]] = [])).push(i); }
+    M.byW = byW; M.byP = byP;
+    M.woIdx = {}; D.w.forEach(function (w, ix) { if (w) M.woIdx[w] = ix; });
+    M.pIdx = {}; D.p.forEach(function (p, ix) { M.pIdx[key(p)] = ix; });
+    M.minDay = N ? P.d[0] : null; M.maxDay = N ? P.d[N - 1] : null;
+
+    // employees
+    M.emp = {}; ds.emp.forEach(function (e) { M.emp[key(e.name)] = e; });
+
+    // family (re-numbered WOs)
+    var back = {}, fwd = {};
+    ds.fam.forEach(function (f) { (back[f[0]] || (back[f[0]] = [])).push(f[1]); (fwd[f[1]] || (fwd[f[1]] = [])).push(f[0]); });
+    M.famBack = back; M.famFwd = fwd; M.famReason = {}; ds.fam.forEach(function (f) { M.famReason[f[0] + '|' + f[1]] = f[2]; });
+
+    // projects
+    M.proj = {}; ds.proj.forEach(function (p) { M.proj[p.wo] = p; });
+
+    // scorecards by WO / designer
+    M.scByDes = {}; M.scByWO = {};
+    ds.sc.forEach(function (s, ix) { (M.scByDes[key(s.des)] || (M.scByDes[key(s.des)] = [])).push(s); if (s.wo) (M.scByWO[s.wo] || (M.scByWO[s.wo] = [])).push(s); });
+    M.scMaxDay = ds.sc.reduce(function (m, s) { return s.d != null && s.d > m ? s.d : m; }, -1e9);
+
+    // rates
+    var r1 = 0, r2 = 0; DESIGN_RATE_KEYS.forEach(function (k) { var r = S.rates[k] || [0, 0]; r1 += r[0]; r2 += r[1]; });
+    M.designFirst = r1; M.designAdd = r2;
+
+    // work orders
+    M.wos = []; M.woMap = {};
+    ds.woh.forEach(function (r) { if (M.woMap[r.wo]) return; var o = woCompute(M, r); M.wos.push(o); M.woMap[r.wo] = o; });
+    // WOs that have time logged but are not in the WO Hours register
+    Object.keys(byW).forEach(function (wi) {
+      var wo = D.w[wi]; if (!wo || wo === OH || wo === TR || M.woMap[wo]) return;
+      var pj = M.proj[wo];
+      var o = woCompute(M, { prog: '', grp: '', wo: wo, desc: pj ? pj.desc : '', wp: pj ? pj.wp : null, des: pj ? pj.des : '', st: pj ? pj.st : '', orig: '', cost: null, mh: null, tsd: pj ? pj.tsd : null, _unlisted: true });
+      M.wos.push(o); M.woMap[wo] = o;
+    });
+    return M;
+  }
+
+  function estDesign(M, wp) { wp = num(wp); return (wp == null || wp < 1) ? 0 : M.designFirst + (wp - 1) * M.designAdd; }
+  function estRes(M, k, wp) { wp = num(wp); var r = M.S.rates[k] || [0, 0]; return (wp == null || wp < 1) ? 0 : r[0] + (wp - 1) * r[1]; }
+
+  function ancestors(M, wo) {
+    var out = [], seen = {}; seen[wo] = 1; var q = [wo];
+    while (q.length) { var x = q.shift(); (M.famBack[x] || []).forEach(function (o) { if (!seen[o]) { seen[o] = 1; out.push(o); q.push(o); } }); }
+    return out;
+  }
+  function descendants(M, wo) {
+    var out = [], seen = {}; seen[wo] = 1; var q = [wo];
+    while (q.length) { var x = q.shift(); (M.famFwd[x] || []).forEach(function (o) { if (!seen[o]) { seen[o] = 1; out.push(o); q.push(o); } }); }
+    return out;
+  }
+  // Which WO numbers roll into this one
+  function rollupSet(M, r) {
+    var set = [r.wo];
+    if (M.S.rollup === 'family') { ancestors(M, r.wo).forEach(function (w) { if (set.indexOf(w) < 0) set.push(w); }); }
+    if (r.orig && set.indexOf(r.orig) < 0) set.push(r.orig);
+    return set;
+  }
+  function rowsFor(M, wos) {
+    var out = [];
+    wos.forEach(function (w) { var ix = M.woIdx[w]; if (ix != null && M.byW[ix]) out = out.concat(M.byW[ix]); });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  function woCompute(M, r) {
+    var P = M.ds.pt, set = rollupSet(M, r), rows = rowsFor(M, set);
+    var desH = 0, act = 0, b = 0, n = 0, tot = 0, first = null, last = null, people = {};
+    rows.forEach(function (i) {
+      var h = P.h[i];
+      if (M.isDesignTask[P.t[i]]) desH += M.billHrs[i];
+      act += M.billHrs[i]; tot += h;
+      if (P.b[i] === 1) b += h; else if (P.b[i] === 0) n += h;
+      if (first == null || P.d[i] < first) first = P.d[i];
+      if (last == null || P.d[i] > last) last = P.d[i];
+      people[P.n[i]] = (people[P.n[i]] || 0) + h;
+    });
+    var est = estDesign(M, r.wp), util = est === 0 ? null : desH / est;
+    var status = est === 0 ? 'No Estimate' : desH === 0 ? 'Not Started' : util > M.S.thresh.over ? 'Over Budget' : util >= M.S.thresh.near ? 'Near Budget' : 'Under Budget';
+    var des = r.des;
+    if (!des) { var top = Object.keys(people).sort(function (a, c) { return people[c] - people[a]; })[0]; des = top != null ? M.ds.dict.p[top] : ''; }
+    var emp = M.emp[key(des)];
+    var pj = M.proj[r.wo];
+    return {
+      wo: r.wo, prog: r.prog, grp: r.grp, desc: r.desc, wp: r.wp, des: des, st: r.st, cost: r.cost, mh: r.mh, orig: r.orig, tsd: r.tsd,
+      unlisted: !!r._unlisted, set: set, nRows: rows.length,
+      est: est, estQC: estRes(M, 'QC', r.wp), desH: desH, remain: est - desH, util: util, budget: status, actual: act,
+      over: Math.max(0, desH - est), eff: (b + n) === 0 ? null : b / (b + n), billH: b, nonBillH: n, totalH: tot,
+      first: first, last: last, team: emp ? emp.loc : '', sent: pj ? pj.sent : null, qa: pj ? pj.qa : '',
+      qcCount: (M.scByWO[r.wo] || []).length
+    };
+  }
+
+  // Full detail for one work order (explorer)
+  function woDetail(M, wo, person) {
+    var o = M.woMap[wo]; if (!o) return null;
+    var P = M.ds.pt, D = M.ds.dict, rows = rowsFor(M, o.set);
+    var pIx = person ? M.pIdx[key(person)] : null;
+    if (person) rows = rows.filter(function (i) { return P.n[i] === pIx; });
+    var tasks = {}, people = {}, weeks = {}, b = 0, n = 0;
+    rows.forEach(function (i) {
+      var t = D.t[P.t[i]] || '(no task)', h = P.h[i];
+      var T = tasks[t] || (tasks[t] = { task: t, b: 0, n: 0, other: 0, prod: 0 });
+      if (P.b[i] === 1) { T.b += h; b += h; } else if (P.b[i] === 0) { T.n += h; n += h; } else T.other += h;
+      T.prod += P.p[i];
+      var pn = D.p[P.n[i]], pp = people[pn] || (people[pn] = { name: pn, h: 0, b: 0, prod: 0, first: P.d[i], last: P.d[i] });
+      pp.h += h; if (P.b[i] === 1) pp.b += h; pp.prod += P.p[i]; pp.last = P.d[i];
+      var ws = weekStart(P.d[i]); weeks[ws] = (weeks[ws] || 0) + h;
+    });
+    var ORDER = ['pole foreman', 'gdt', 'maximo/deliverables', 'design qaqc', 'support'];
+    var taskList = Object.keys(tasks).map(function (k) { return tasks[k]; }).sort(function (x, y) {
+      var a = ORDER.indexOf(key(x.task)), c = ORDER.indexOf(key(y.task)); a = a < 0 ? 99 : a; c = c < 0 ? 99 : c; return a - c || x.task.localeCompare(y.task);
+    });
+    return {
+      wo: o, rows: rows, tasks: taskList, people: Object.keys(people).map(function (k) { return people[k]; }).sort(function (x, y) { return y.h - x.h; }),
+      weeks: Object.keys(weeks).map(Number).sort(function (x, y) { return x - y; }).map(function (w) { return [w, weeks[w]]; }),
+      billH: b, nonBillH: n, eff: (b + n) ? b / (b + n) : null,
+      ancestors: ancestors(M, wo), descendants: descendants(M, wo), scorecards: M.scByWO[wo] || []
+    };
+  }
+
+  /* ---------- efficiency ---------- */
+  // Billable = Billable & client Entergy, plus every TS New Hire hour. Non-billable = Not Billable & Entergy.
+  function effAgg(M, rows) {
+    var P = M.ds.pt, r = { b: 0, n: 0, oh: 0, tr: 0, tot: 0 };
+    for (var k = 0; k < rows.length; k++) {
+      var i = rows[k], h = P.h[i], c = P.c[i], w = P.w[i];
+      if (M.cNew[c]) r.b += h; else if (M.cEnt[c]) { if (P.b[i] === 1) r.b += h; else if (P.b[i] === 0) r.n += h; }
+      if (M.isOH[w]) r.oh += h; if (M.isTR[w]) r.tr += h; r.tot += h;
+    }
+    r.eff = (r.b + r.n) === 0 ? null : r.b / (r.b + r.n);
+    return r;
+  }
+  function personRows(M, name, from, to) { // [from, to) in days
+    var ix = M.pIdx[key(name)]; if (ix == null) return [];
+    var P = M.ds.pt, all = M.byP[ix] || [];
+    if (from == null && to == null) return all;
+    return all.filter(function (i) { return (from == null || P.d[i] >= from) && (to == null || P.d[i] < to); });
+  }
+  function rangeRows(M, from, to) {
+    var P = M.ds.pt, out = [];
+    for (var i = 0; i < M.N; i++) { var d = P.d[i]; if (d >= from && d < to) out.push(i); }
+    return out;
+  }
+  function peopleInRange(M, from, to) {
+    var P = M.ds.pt, seen = {};
+    rangeRows(M, from, to).forEach(function (i) { seen[P.n[i]] = 1; });
+    return Object.keys(seen).map(function (ix) { return M.ds.dict.p[ix]; });
+  }
+  function weeksBetween(from, to) { var out = []; for (var w = weekStart(from); w <= to; w += 7) out.push(w); return out; }
+
+  /* ---------- QC ---------- */
+  function qcSummary(M, name) {
+    var L = M.scByDes[key(name)] || [];
+    var ov = avg(L.map(function (s) { return s.ov; }));
+    var recent = avg(L.filter(function (s) { return s.d != null && s.d >= M.scMaxDay - 60; }).map(function (s) { return s.ov; }));
+    var trend = recent == null || ov == null ? 0 : (recent - ov > 0.02 ? 1 : recent - ov < -0.02 ? -1 : 0);
+    return { name: name, n: L.length, pf: avg(L.map(function (s) { return s.pf; })), gdt: avg(L.map(function (s) { return s.gdt; })), del: avg(L.map(function (s) { return s.del; })), ov: ov, grade: L.length ? grade(ov) : '', trend: trend, recent: recent, list: L };
+  }
+  function qcDesigners(M) { var seen = {}; M.ds.sc.forEach(function (s) { seen[s.des] = 1; }); return Object.keys(seen); }
+
+  /* ---------- tasks ---------- */
+  // One observation = one (WO, designer, task) combination, like the Task Hours Calc helper.
+  function taskObs(M, filter) {
+    var P = M.ds.pt, D = M.ds.dict, obs = {};
+    for (var i = 0; i < M.N; i++) {
+      var t = D.t[P.t[i]].trim(), w = D.w[P.w[i]], p = D.p[P.n[i]];
+      if (!t || !w || !p) continue;
+      if (filter && !filter(i, t, w, p)) continue;
+      var k = w + '\u0001' + p + '\u0001' + t, o = obs[k] || (obs[k] = { wo: w, p: p, t: t, h: 0 });
+      o.h += P.h[i] || 0;
+    }
+    return Object.keys(obs).map(function (k) { return obs[k]; });
+  }
+
+  /* ---------- production ---------- */
+  function weeklyProduction(M) {
+    var P = M.ds.pt, out = [];
+    if (M.maxDay == null) return out;
+    for (var ws = M.S.prodStart, n = 1; ws <= M.maxDay; ws += 7, n++) out.push({ n: n, start: ws, pf: 0, gdt: 0 });
+    for (var i = 0; i < M.N; i++) {
+      var d = P.d[i]; if (d < M.S.prodStart) continue;
+      var k = Math.floor((d - M.S.prodStart) / 7), t = M.tkey[P.t[i]];
+      if (!out[k]) continue;
+      if (t === 'pole foreman') out[k].pf += P.p[i]; else if (t === 'gdt') out[k].gdt += P.p[i];
+    }
+    return out;
+  }
+  function designerWeek(M, name, ws) {
+    var P = M.ds.pt, rows = personRows(M, name, ws, ws + 7);
+    var r = { prodPF: 0, prodGDT: 0, scope: 0, pfH: 0, gdtH: 0, maxH: 0, qaqc: 0, tot: 0 };
+    rows.forEach(function (i) {
+      var t = M.tkey[P.t[i]], h = P.h[i], bill = P.b[i] === 1;
+      if (t === 'pole foreman') { r.prodPF += P.p[i]; if (bill) r.pfH += h; }
+      if (t === 'gdt') { r.prodGDT += P.p[i]; if (bill) r.gdtH += h; }
+      if (t === 'scope review & wo setup' && bill) r.scope += h;
+      if (t === 'maximo/deliverables' && bill) r.maxH += h;
+      if (M.ds.dict.t[P.t[i]] === 'QAQC Corrections ' || t === 'qaqc corrections') r.qaqc += h;
+      r.tot += h;
+    });
+    r.left = M.wos.filter(function (o) { return key(o.des) === key(name) && key(o.st) === 'in design'; }).reduce(function (s, o) { return s + o.remain; }, 0);
+    r.wpPerHr = (r.pfH + r.gdtH) ? (r.prodPF + r.prodGDT) / (r.pfH + r.gdtH) : null;
+    return r;
+  }
+
+  /* ---------- estimator (ramp-up schedule) ---------- */
+  function rampMult(S, day) { var m = S.ramp[0][1]; S.ramp.forEach(function (r) { if (day >= r[0]) m = r[1]; }); return m; }
+  function estimate(M, wp, designerDay, startDay, hpd, skipWeekends) {
+    var S = M.S, budget = (wp == null || wp < 1) ? 0 : (wp === 1 ? M.designFirst : M.designFirst + (wp - 1) * M.designAdd);
+    var sched = [], left = budget, date = startDay, dd = designerDay, total = 0;
+    if (skipWeekends) while (dow(date) > 4) date++;
+    for (var k = 0; k < 60 && left > 0.0001 && hpd > 0; k++) {
+      var m = rampMult(S, dd), worked = Math.min(hpd, left * m), earned = worked / m;
+      sched.push({ day: dd, date: date, mult: m, leftStart: left, worked: worked, earned: earned, leftEnd: left - earned });
+      left -= earned; total += worked;
+      var nd = date + 1; if (skipWeekends) while (dow(nd) > 4) nd++;
+      dd = designerDay + (nd - startDay); date = nd;
+    }
+    var last = sched[sched.length - 1];
+    return { budget: budget, hours: total, finish: last ? last.date : null, finishDay: last ? last.day : null, days: sched.length, sched: sched,
+      speed: budget ? total / budget : null, flat: budget * rampMult(S, designerDay) };
+  }
+
+  /* ---------- data checks ---------- */
+  function dataChecks(M) {
+    var P = M.ds.pt, D = M.ds.dict, out = [];
+    var noBill = 0, noWO = 0, noTask = 0, zeroH = 0;
+    for (var i = 0; i < M.N; i++) { if (P.b[i] < 0) noBill++; if (!D.w[P.w[i]]) noWO++; if (!D.t[P.t[i]]) noTask++; if (!P.h[i]) zeroH++; }
+    out.push({ id: 'nobill', label: 'Entries with no Billable? value', n: noBill, hint: 'These hours count toward totals but not toward efficiency.' });
+    out.push({ id: 'nowo', label: 'Entries with no work order', n: noWO, hint: 'They cannot roll up to any WO budget.' });
+    out.push({ id: 'notask', label: 'Entries with no task', n: noTask, hint: 'They are skipped by task and budget calculations.' });
+    out.push({ id: 'zeroh', label: 'Entries with 0 hours', n: zeroH, hint: 'Often production-only lines; usually fine.' });
+    var unlisted = M.wos.filter(function (o) { return o.unlisted; });
+    out.push({ id: 'unlisted', label: 'Work orders with time logged but missing from WO Hours', n: unlisted.length, hint: 'They have no budget, so they show as "No Estimate".', list: unlisted.slice(0, 60).map(function (o) { return o.wo; }) });
+    var noEmp = D.p.filter(function (p) { return p && !M.emp[key(p)]; });
+    out.push({ id: 'noemp', label: 'People logging time who are not on the Employee List', n: noEmp.length, hint: 'Location and start date will be blank for them.', list: noEmp });
+    var stKeys = {}; D.s.forEach(function (s) { if (s) { var k = key(s).replace(/\s+/g, ''); (stKeys[k] || (stKeys[k] = [])).push(s); } });
+    var variants = Object.keys(stKeys).filter(function (k) { return stKeys[k].length > 1; }).map(function (k) { return stKeys[k].map(function (s) { return '"' + s + '"'; }).join(' / '); });
+    out.push({ id: 'status', label: 'Status values spelled more than one way', n: variants.length, hint: 'Pick one spelling so filters catch every row.', list: variants });
+    var tKeys = {}; D.t.forEach(function (t) { if (t) { var k = key(t); (tKeys[k] || (tKeys[k] = [])).push(t); } });
+    var tv = Object.keys(tKeys).filter(function (k) { return tKeys[k].length > 1; }).map(function (k) { return tKeys[k].map(function (s) { return '"' + s + '"'; }).join(' / '); });
+    out.push({ id: 'task', label: 'Task names spelled more than one way (case or trailing spaces)', n: tv.length, hint: 'The app treats these as the same task; Excel formulas may not.', list: tv });
+    var noWP = M.wos.filter(function (o) { return !o.unlisted && !(o.wp >= 1); });
+    out.push({ id: 'nowp', label: 'Registered WOs with no work point count', n: noWP.length, hint: 'No budget can be estimated without work points.', list: noWP.slice(0, 60).map(function (o) { return o.wo; }) });
+    return out;
+  }
+
+  return {
+    OH: OH, TR: TR, DEFAULTS: DEFAULTS, CATCH_ALL: CATCH_ALL, KEYWORDS: KEYWORDS, DESIGN_TASKS: DESIGN_TASKS,
+    key: key, num: num, toDay: toDay, dow: dow, weekStart: weekStart, dayToISO: dayToISO, grade: grade, avg: avg,
+    parseWorkbook: parseWorkbook, buildModel: buildModel, settingsFrom: settingsFrom, woCompute: woCompute, woDetail: woDetail,
+    effAgg: effAgg, personRows: personRows, rangeRows: rangeRows, peopleInRange: peopleInRange, weeksBetween: weeksBetween,
+    qcSummary: qcSummary, qcDesigners: qcDesigners, taskObs: taskObs, weeklyProduction: weeklyProduction, designerWeek: designerWeek,
+    estimate: estimate, rampMult: rampMult, estDesign: estDesign, estRes: estRes, ancestors: ancestors, descendants: descendants, dataChecks: dataChecks
+  };
+})();
+if (typeof module !== 'undefined') module.exports = Core;
+</script>
+<script>
+(function () {
+'use strict';
+var K = Core.key;
+var VIEWS = [
+  ['efficiency', 'Efficiency'], ['workorders', 'Work Orders'], ['designers', 'Designers'], ['qc', 'QC Scorecards'],
+  ['production', 'Production'], ['tasks', 'Task Time'], ['estimator', 'Hour Estimator'], ['data', 'Data Check'], ['settings', 'Settings']
+];
+var App = {
+  ds: null, M: null, meta: null, saved: null, view: 'efficiency', sort: {},
+  caps: { db: null, assets: null, user: null, downloads: null }, canEdit: false, uid: null,
+  ui: { eff: {}, wo: {}, des: {}, qc: {}, prod: {}, tasks: {}, est: {}, data: {} }
+};
+window.__app = App;
+
+/* ---------------- utilities ---------------- */
+function $(s, r) { return (r || document).querySelector(s); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function fh(n, d) { if (n == null || isNaN(n)) return '—'; d = d == null ? 2 : d; var m = Math.pow(10, d); return (Math.round(n * m) / m).toLocaleString('en-US', { maximumFractionDigits: d }); }
+function pct(x, d) { return x == null || isNaN(x) ? '—' : (x * 100).toFixed(d == null ? 1 : d) + '%'; }
+var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fd(day, yr) { if (day == null) return '—'; var t = new Date(day * 864e5); return MON[t.getUTCMonth()] + ' ' + t.getUTCDate() + (yr === false ? '' : ', ' + t.getUTCFullYear()); }
+function fdShort(day) { if (day == null) return ''; var t = new Date(day * 864e5); return (t.getUTCMonth() + 1) + '/' + t.getUTCDate(); }
+function todayDay() { var t = new Date(); return Math.floor(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) / 864e5); }
+function sum(a, f) { var s = 0; for (var i = 0; i < a.length; i++) s += f ? (f(a[i]) || 0) : (a[i] || 0); return s; }
+function toast(msg, ms) { var t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, ms || 3800); }
+function lsGet(k, d) { try { var v = localStorage.getItem('pct:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
+function lsSet(k, v) { try { localStorage.setItem('pct:' + k, JSON.stringify(v)); } catch (e) {} }
+function emp(name) { return App.M ? App.M.emp[K(name)] : null; }
+function isDesigner(name) { var e = emp(name); return !!e && K(e.task) === 'design'; }
+function target() { return App.M.S.effTarget || 0.75; }
+function effTone(e) { if (e == null) return ''; var t = target(); return e >= t ? 'good' : e >= t - 0.1 ? 'warn' : 'bad'; }
+function heat(e) { if (e == null) return 'transparent'; var t = target(); return e >= t + .1 ? 'var(--h4)' : e >= t ? 'var(--h3)' : e >= t - .1 ? 'var(--h2)' : e >= t - .25 ? 'var(--h1)' : 'var(--h0)'; }
+function budgetTone(s) { return s === 'Over Budget' ? 'bad' : s === 'Near Budget' ? 'warn' : s === 'Under Budget' ? 'good' : ''; }
+function gradeTone(g) { if (!g) return ''; var c = g[0]; return c === 'A' ? 'good' : c === 'B' ? 'acc' : c === 'C' ? 'warn' : 'bad'; }
+function pill(text, tone) { return text ? '<span class="pill ' + (tone || '') + '">' + esc(text) + '</span>' : '<span class="muted">—</span>'; }
+function gradeBox(g) { return g ? '<span class="grade pill ' + gradeTone(g) + '">' + esc(g) + '</span>' : '<span class="muted">—</span>'; }
+function meter(v, max, opts) {
+  opts = opts || {}; var w = v == null ? 0 : Math.max(0, Math.min(1, v / max)) * 100;
+  var col = opts.color || 'var(--accent)';
+  var marks = (opts.marks || []).map(function (m) { return '<b style="left:' + Math.min(100, m / max * 100) + '%"></b>'; }).join('');
+  return '<div class="meter"><i style="width:' + w + '%;background:' + col + '"></i>' + marks + '</div>';
+}
+function effCell(e) {
+  var tone = effTone(e), col = tone ? 'var(--' + tone + ')' : 'var(--line)';
+  return '<div class="mcell">' + meter(e, 1, { color: col, marks: [target()] }) + '<span>' + pct(e) + '</span></div>';
+}
+function utilCell(o) {
+  if (o.util == null) return '<span class="muted">no estimate</span>';
+  var col = 'var(--' + (budgetTone(o.budget) || 'accent') + ')';
+  return '<div class="mcell">' + meter(o.util, 1.5, { color: col, marks: [App.M.S.thresh.near, App.M.S.thresh.over] }) + '<span>' + pct(o.util, 0) + '</span></div>';
+}
+function personLink(name) { return name ? '<a href="#designers" data-des="' + esc(name) + '">' + esc(name) + '</a>' : '<span class="muted">—</span>'; }
+function woLink(wo) { return '<a href="#workorders" class="mono" data-wo="' + esc(wo) + '">' + esc(wo) + '</a>'; }
+function opt(v, label, sel) { return '<option value="' + esc(v) + '"' + (String(v) === String(sel) ? ' selected' : '') + '>' + esc(label == null ? v : label) + '</option>'; }
+function sel(id, f, options, cur, label) {
+  return '<label class="f" for="' + id + '">' + esc(label) + '<select id="' + id + '" data-f="' + f + '">' + options.map(function (o) { return Array.isArray(o) ? opt(o[0], o[1], cur) : opt(o, o, cur); }).join('') + '</select></label>';
+}
+function people() { return App.M.ds.dict.p.filter(Boolean).slice().sort(); }
+function locations() { var s = {}; App.M.ds.emp.forEach(function (e) { if (e.loc) s[e.loc] = 1; }); return Object.keys(s).sort(); }
+function locOk(name, loc) { if (!loc || loc === 'all') return true; var e = emp(name); return !!e && e.loc === loc; }
+
+/* ---------------- charts (hand-drawn SVG, theme tokens) ---------------- */
+function niceMax(v) { if (v <= 0) return 4; var st = v / 4, p = Math.pow(10, Math.floor(Math.log10(st))), n = st / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p * 4; }
+function lineChart(o) {
+  var W = 720, H = o.h || 220, L = 46, R = 14, T = 12, B = 30, iw = W - L - R, ih = H - T - B;
+  var n = o.labels.length; if (!n) return '<div class="empty">No data for this range.</div>';
+  var yMax = o.yMax != null ? o.yMax : niceMax(Math.max.apply(null, o.series.map(function (s) { return Math.max.apply(null, s.values.map(function (v) { return v || 0; })); })));
+  var yMin = o.yMin || 0;
+  function x(i) { return L + (n === 1 ? iw / 2 : i * iw / (n - 1)); }
+  function y(v) { return T + ih - (v - yMin) / (yMax - yMin) * ih; }
+  var g = '', ticks = 4;
+  for (var k = 0; k <= ticks; k++) { var v = yMin + (yMax - yMin) * k / ticks; g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + esc(o.yFmt ? o.yFmt(v) : fh(v, 0)) + '</text>'; }
+  var every = Math.ceil(n / 10);
+  o.labels.forEach(function (lb, i) { if (i % every === 0 || i === n - 1) g += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lb) + '</text>'; });
+  if (o.target != null) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(o.target) + '" y2="' + y(o.target) + '" style="stroke:var(--copper);stroke-dasharray:4 4;stroke-width:1.5"/><text x="' + (W - R) + '" y="' + (y(o.target) - 5) + '" text-anchor="end" style="fill:var(--copper)">target ' + esc(o.yFmt ? o.yFmt(o.target) : o.target) + '</text>';
+  o.series.forEach(function (s, si) {
+    var pts = [], seg = '';
+    s.values.forEach(function (v, i) { if (v == null) { if (pts.length) { seg += 'M' + pts.join('L'); pts = []; } return; } pts.push(x(i).toFixed(1) + ',' + y(v).toFixed(1)); });
+    if (pts.length) seg += 'M' + pts.join('L');
+    if (si === 0 && o.area) {
+      var first = s.values.findIndex(function (v) { return v != null; }), lastI = s.values.length - 1 - s.values.slice().reverse().findIndex(function (v) { return v != null; });
+      if (first >= 0 && s.values.every(function (v, i) { return i < first || i > lastI || v != null; })) {
+        var ap = s.values.slice(first, lastI + 1).map(function (v, j) { return x(first + j).toFixed(1) + ',' + y(v).toFixed(1); });
+        g += '<path d="M' + x(first) + ',' + y(yMin) + 'L' + ap.join('L') + 'L' + x(lastI) + ',' + y(yMin) + 'Z" style="fill:' + s.color + ';opacity:.12"/>';
+      }
+    }
+    g += '<path d="' + seg + '" style="fill:none;stroke:' + s.color + ';stroke-width:' + (s.w || 2.25) + (s.dash ? ';stroke-dasharray:' + s.dash : '') + '"/>';
+    s.values.forEach(function (v, i) {
+      if (v == null) return; var last = i === s.values.length - 1;
+      g += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="' + (last ? 4.5 : 3) + '" style="fill:' + (last ? s.color : 'var(--surface)') + ';stroke:' + s.color + ';stroke-width:2"><title>' + esc(s.name + ' · ' + o.labels[i] + ': ' + (o.yFmt ? o.yFmt(v) : fh(v))) + '</title></circle>';
+    });
+  });
+  var leg = o.series.length > 1 || o.legend ? '<div class="legend">' + o.series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + '</span>'; }).join('') + '</div>' : '';
+  return leg + '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.title || 'chart') + '">' + g + '</svg>';
+}
+function barChart(o) {
+  var W = 720, H = o.h || 220, L = 46, R = 10, T = 12, B = 30, iw = W - L - R, ih = H - T - B;
+  var n = o.labels.length; if (!n) return '<div class="empty">No data for this range.</div>';
+  var totals = o.labels.map(function (_, i) { return sum(o.series, function (s) { return s.values[i]; }); });
+  var yMax = niceMax(Math.max.apply(null, totals.concat([0.0001])));
+  var bw = iw / n, g = '';
+  function y(v) { return T + ih - v / yMax * ih; }
+  for (var k = 0; k <= 4; k++) { var v = yMax * k / 4; g += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + fh(v, 0) + '</text>'; }
+  var every = Math.ceil(n / 12);
+  o.labels.forEach(function (lb, i) {
+    var acc = 0, x0 = L + i * bw + bw * 0.15, w = bw * 0.7;
+    o.series.forEach(function (s) {
+      var v = s.values[i] || 0; if (v <= 0) return;
+      g += '<rect x="' + x0.toFixed(1) + '" y="' + y(acc + v).toFixed(1) + '" width="' + Math.max(1, w).toFixed(1) + '" height="' + (y(acc) - y(acc + v)).toFixed(1) + '" rx="1.5" style="fill:' + s.color + (o.hi != null && o.hi !== i ? ';opacity:.55' : '') + '"><title>' + esc(lb + ' · ' + s.name + ': ' + fh(v)) + '</title></rect>';
+      acc += v;
+    });
+    if (i % every === 0 || i === n - 1) g += '<text x="' + (L + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lb) + '</text>';
+  });
+  var leg = o.series.length > 1 ? '<div class="legend">' + o.series.map(function (s) { return '<span><i style="background:' + s.color + ';height:10px;width:10px"></i>' + esc(s.name) + '</span>'; }).join('') + '</div>' : '';
+  return leg + '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.title || 'chart') + '">' + g + '</svg>';
+}
+
+/* ---------------- sortable tables + CSV ---------------- */
+var TABLES = {};
+function table(id, cols, rows, opts) {
+  opts = opts || {};
+  var st = App.sort[id] || opts.sort || null;
+  if (st) {
+    var c = cols.filter(function (c) { return c.k === st.k; })[0];
+    if (c) {
+      var f = c.v || function (r) { return r[c.k]; };
+      rows = rows.slice().sort(function (a, b) {
+        var x = f(a), y = f(b);
+        if (x == null || x === '') return 1; if (y == null || y === '') return -1;
+        var r = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+        return st.asc ? r : -r;
+      });
+    }
+  }
+  TABLES[id] = { cols: cols, rows: rows, name: opts.csv || id };
+  var limit = opts.limit && !App.ui['more_' + id] ? opts.limit : Infinity;
+  var shown = rows.slice(0, limit);
+  var h = '<div class="tbl-wrap' + (opts.tall ? ' tall' : '') + '"><table><thead><tr>' + cols.map(function (c) {
+    var s = st && st.k === c.k;
+    return '<th' + (c.n ? ' class="n' + (s ? ' sorted' + (st.asc ? ' asc' : '') : '') + '"' : (s ? ' class="sorted' + (st.asc ? ' asc' : '') + '"' : '')) + (c.nosort ? '' : ' data-sort="' + id + '|' + c.k + '"') + ' scope="col">' + esc(c.l) + '</th>';
+  }).join('') + '</tr></thead><tbody>';
+  if (!shown.length) h += '<tr><td colspan="' + cols.length + '" class="empty">' + esc(opts.empty || 'Nothing matches these filters.') + '</td></tr>';
+  shown.forEach(function (r) {
+    var go = opts.go ? opts.go(r) : '';
+    h += '<tr' + (go ? ' data-go="' + esc(go) + '" tabindex="0"' : '') + '>' + cols.map(function (c) {
+      var v = c.f ? c.f(r) : esc(r[c.k] == null ? '' : r[c.k]);
+      return '<td class="' + (c.n ? 'n' : '') + (c.wrap ? ' wrap' : '') + '">' + v + '</td>';
+    }).join('') + '</tr>';
+  });
+  h += '</tbody>';
+  if (opts.foot) h += '<tfoot><tr>' + opts.foot.map(function (f, i) { return '<td class="' + (cols[i] && cols[i].n ? 'n' : '') + '">' + f + '</td>'; }).join('') + '</tr></tfoot>';
+  h += '</table></div>';
+  if (rows.length > shown.length) h += '<div class="row" style="margin-top:8px"><span class="muted">Showing ' + shown.length + ' of ' + rows.length + '.</span><button class="btn ghost" data-act="more" data-id="' + id + '">Show all</button></div>';
+  return h;
+}
+function csvBtn(id) { return App.caps.downloads ? '<button class="btn" data-act="csv" data-id="' + id + '" type="button">Export CSV</button>' : ''; }
+function exportCSV(id) {
+  var t = TABLES[id]; if (!t || !App.caps.downloads) return;
+  var cols = t.cols.filter(function (c) { return !c.nocsv; });
+  var lines = [cols.map(function (c) { return '"' + c.l.replace(/"/g, '""') + '"'; }).join(',')];
+  t.rows.forEach(function (r) {
+    lines.push(cols.map(function (c) {
+      var v = c.csv ? c.csv(r) : c.v ? c.v(r) : r[c.k];
+      if (v == null) v = ''; if (typeof v === 'number') v = Math.round(v * 10000) / 10000;
+      return '"' + String(v).replace(/"/g, '""') + '"';
+    }).join(','));
+  });
+  App.caps.downloads.save({ filename: t.name + '.csv', data: new Blob([lines.join('\r\n')], { type: 'text/csv' }) })
+    .then(function () { toast('Saved ' + t.name + '.csv'); }).catch(function (e) { if (e && e.code !== 'cancelled' && e.code !== 'declined') toast('The file was not saved.'); });
+}
+
+/* ---------------- shell ---------------- */
+function renderTabs() {
+  $('#tabs').innerHTML = VIEWS.map(function (v) { return '<a href="#' + v[0] + '"' + (App.view === v[0] ? ' class="on" aria-current="page"' : '') + '>' + esc(v[1]) + '</a>'; }).join('');
+}
+function renderInfo() {
+  var el = $('#datainfo');
+  if (!App.ds) { el.innerHTML = 'No workbook loaded'; return; }
+  var m = App.meta || {}, c = App.ds.counts;
+  var who = m.uploaderName ? ' by ' + esc(m.uploaderName) : '';
+  var when = m.uploadedAt ? new Date(m.uploadedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  var scope = m.local ? ' <span class="pill warn">this device only</span>' : '';
+  el.innerHTML = '<b>' + esc(m.fileName || App.ds.file || 'Workbook') + '</b> · ' + (when ? 'uploaded ' + esc(when) + who + ' · ' : '') + 'time logged through ' + fd(c.maxDay) + scope;
+  el.title = el.textContent;
+}
+var renderQueued = false;
+function render() {
+  renderTabs(); renderInfo();
+  var main = $('#main');
+  if (!App.M) { main.innerHTML = emptyState(); bindDrop(); return; }
+  var a = document.activeElement, aid = a && a.id, s0 = a && a.selectionStart, s1 = a && a.selectionEnd;
+  var y = window.scrollY;
+  var html;
+  try { html = (VIEW_FN[App.view] || VIEW_FN.efficiency)(); }
+  catch (e) { console.error(e); html = '<div class="panel"><h3>Something went wrong drawing this view</h3><p class="sub">' + esc(e.message) + '</p></div>'; }
+  main.innerHTML = html;
+  if (aid) { var n = document.getElementById(aid); if (n) { n.focus(); try { if (s0 != null) n.setSelectionRange(s0, s1); } catch (e) {} } }
+  if (!render.nav) window.scrollTo(0, y); render.nav = false;
+  lsSet('ui', App.ui); lsSet('sort', App.sort);
+}
+function emptyState() {
+  var canShare = !!App.caps.assets;
+  return '<div class="drop" id="drop"><h2>Load your production tracker</h2>' +
+    '<p>Drop the PC Production Tracker workbook (.xlsx) here or choose it from your computer. Everything is recalculated from the Production Tracker, WO Hours, Project Tracker, Scorecard and Employee List sheets.</p>' +
+    '<button class="btn primary" data-act="upload" type="button">Choose workbook</button>' +
+    '<p style="margin-top:16px;font-size:12px">' + (canShare ? 'When you upload, everyone who opens this app sees the new data.' : 'Uploads stay in this browser unless you have edit access to the app.') + '</p></div>';
+}
+function bindDrop() {
+  var d = $('#drop'); if (!d) return;
+  d.addEventListener('dragover', function (e) { e.preventDefault(); d.classList.add('over'); });
+  d.addEventListener('dragleave', function () { d.classList.remove('over'); });
+  d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); var f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+}
+
+/* ---------------- EFFICIENCY ---------------- */
+function defaultWeek() { var M = App.M; return Core.dow(M.maxDay) >= 4 ? Core.weekStart(M.maxDay) : Core.weekStart(M.maxDay) - 7; }
+function effPeople(ws, u) {
+  var M = App.M, set = {};
+  Core.peopleInRange(M, ws, ws + 7).forEach(function (p) { set[p] = 1; });
+  if (u.role !== 'all') M.ds.emp.forEach(function (e) { if (K(e.task) === 'design' && (e.start == null || e.start < ws + 7)) set[e.name] = 1; });
+  return Object.keys(set).filter(function (p) { return (u.role === 'all' || isDesigner(p)) && locOk(p, u.loc); });
+}
+function viewEfficiency() {
+  var M = App.M, u = App.ui.eff;
+  if (u.week == null || u.week > M.maxDay) u.week = defaultWeek();
+  u.loc = u.loc || 'all'; u.role = u.role || 'design'; u.span = u.span || 8;
+  var ws = +u.week, list = effPeople(ws, u);
+  var rows = list.map(function (p) {
+    var a = Core.effAgg(M, Core.personRows(M, p, ws, ws + 7)), pr = Core.effAgg(M, Core.personRows(M, p, ws - 7, ws)), e = emp(p) || {};
+    return { name: p, loc: e.loc || '', start: e.start, dstart: e.start != null ? e.start + 28 : null, eff: a.eff, b: a.b, n: a.n, oh: a.oh, tr: a.tr, tot: a.tot, prev: pr.eff, delta: a.eff != null && pr.eff != null ? a.eff - pr.eff : null };
+  });
+  var T = { b: sum(rows, function (r) { return r.b; }), n: sum(rows, function (r) { return r.n; }), oh: sum(rows, function (r) { return r.oh; }), tr: sum(rows, function (r) { return r.tr; }), tot: sum(rows, function (r) { return r.tot; }) };
+  T.eff = T.b + T.n ? T.b / (T.b + T.n) : null;
+  // previous week team
+  var prevRows = effPeople(ws - 7, u).map(function (p) { return Core.effAgg(M, Core.personRows(M, p, ws - 7, ws)); });
+  var pb = sum(prevRows, function (r) { return r.b; }), pn = sum(prevRows, function (r) { return r.n; }), pe = pb + pn ? pb / (pb + pn) : null;
+  // trend
+  var weeks = []; for (var w = ws - (u.span - 1) * 7; w <= ws; w += 7) if (w >= Core.weekStart(M.minDay)) weeks.push(w);
+  var trend = weeks.map(function (w) { var ag = effPeople(w, u).map(function (p) { return Core.effAgg(M, Core.personRows(M, p, w, w + 7)); }); var b = sum(ag, function (r) { return r.b; }), n = sum(ag, function (r) { return r.n; }); return b + n ? b / (b + n) : null; });
+  var below = rows.filter(function (r) { return r.eff != null && r.eff < target(); }).length;
+  var noTime = rows.filter(function (r) { return !r.tot; }).length;
+  var weekOpts = Core.weeksBetween(M.minDay, M.maxDay).reverse().map(function (w) { return [w, 'Week of ' + fd(w) + (w + 6 > M.maxDay ? ' (in progress)' : '')]; });
+  var dlt = T.eff != null && pe != null ? T.eff - pe : null;
+  var h = '<div class="head"><div><h2>Team efficiency</h2><p class="sub">Billable share of Entergy hours, plus all TS New Hire hours, for ' + fd(ws, false) + ' – ' + fd(ws + 6) + '. Overhead (00000000) and training (00000001) are shown separately.</p></div>' +
+    '<div class="row">' + sel('effWeek', 'eff.week', weekOpts, ws, 'Focus week') + sel('effLoc', 'eff.loc', [['all', 'All locations']].concat(locations()), u.loc, 'Location') +
+    sel('effRole', 'eff.role', [['design', 'Designers'], ['all', 'Everyone who logged time']], u.role, 'Who') + sel('effSpan', 'eff.span', [[4, '4 weeks'], [8, '8 weeks'], [12, '12 weeks'], [26, '26 weeks']], u.span, 'Trend') + '</div></div>';
+  h += '<div class="stack"><div class="kpis">' +
+    '<div class="kpi hero"><div class="l">Team efficiency</div><div class="v">' + pct(T.eff) + '</div><div class="d">' + (dlt == null ? 'no prior week' : '<span class="' + (dlt >= 0 ? 'up' : 'down') + '">' + (dlt >= 0 ? '▲ ' : '▼ ') + (Math.abs(dlt) * 100).toFixed(1) + ' pts</span> vs prior week') + '</div></div>' +
+    kpi('Billable hrs', fh(T.b)) + kpi('Non-billable hrs', fh(T.n)) + kpi('Overhead hrs', fh(T.oh)) + kpi('Training hrs', fh(T.tr)) + kpi('Total hrs', fh(T.tot), rows.length + ' people') +
+    kpi('Below target', below, 'target ' + pct(target(), 0)) + '</div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Weekly team efficiency</h3><span class="muted">' + weeks.length + ' weeks ending ' + fd(ws, false) + '</span></div>' +
+    lineChart({ labels: weeks.map(fdShort), series: [{ name: 'Team efficiency', color: 'var(--accent)', values: trend }], yMin: 0, yMax: 1, yFmt: function (v) { return Math.round(v * 100) + '%'; }, target: target(), area: true, title: 'Weekly team efficiency' }) + '</div>';
+  var cols = [
+    { k: 'loc', l: 'Location' }, { k: 'name', l: 'Designer', f: function (r) { return personLink(r.name) + (r.tot ? '' : ' <span class="flag">no time logged</span>') + (r.tot && r.tot < 32 && ws + 6 <= M.maxDay ? ' <span class="flag">' + fh(r.tot, 1) + ' hrs</span>' : ''); }, csv: function (r) { return r.name; } },
+    { k: 'start', l: 'Start date', f: function (r) { return fd(r.start); }, csv: function (r) { return Core.dayToISO(r.start); } },
+    { k: 'dstart', l: 'Design start', f: function (r) { return fd(r.dstart); }, csv: function (r) { return Core.dayToISO(r.dstart); } },
+    { k: 'eff', l: 'Efficiency', f: function (r) { return effCell(r.eff); } },
+    { k: 'delta', l: 'vs prior wk', n: 1, f: function (r) { return r.delta == null ? '<span class="muted">—</span>' : '<span class="' + (r.delta >= 0 ? 'up' : 'down') + '">' + (r.delta >= 0 ? '+' : '') + (r.delta * 100).toFixed(1) + '</span>'; } },
+    { k: 'b', l: 'Billable', n: 1, f: function (r) { return fh(r.b); } }, { k: 'n', l: 'Non-billable', n: 1, f: function (r) { return fh(r.n); } },
+    { k: 'oh', l: 'Overhead', n: 1, f: function (r) { return fh(r.oh); } }, { k: 'tr', l: 'Training', n: 1, f: function (r) { return fh(r.tr); } }, { k: 'tot', l: 'Total', n: 1, f: function (r) { return fh(r.tot); } }
+  ];
+  h += '<div class="panel"><div class="panel-h"><h3>By designer</h3><div class="row">' + csvBtn('eff') + '</div></div>' +
+    table('eff', cols, rows, { sort: { k: 'eff', asc: false }, go: function (r) { return 'des:' + r.name; }, csv: 'efficiency-' + Core.dayToISO(ws),
+      foot: ['', 'Team', '', '', pct(T.eff), '', fh(T.b), fh(T.n), fh(T.oh), fh(T.tr), fh(T.tot)] }) +
+    (noTime ? '<p class="note" style="margin-top:10px">' + noTime + ' designer' + (noTime > 1 ? 's have' : ' has') + ' no time logged this week.</p>' : '') + '</div>';
+  // heatmap
+  var hr = rows.slice().sort(function (a, b) { return (a.loc || 'zz').localeCompare(b.loc || 'zz') || a.name.localeCompare(b.name); });
+  var hh = '<div class="tbl-wrap"><table class="heat"><thead><tr><th>Designer</th>' + weeks.map(function (w) { return '<th class="n">' + fdShort(w) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  hr.forEach(function (r) {
+    hh += '<tr data-go="des:' + esc(r.name) + '" tabindex="0"><td>' + esc(r.name) + ' <span class="muted">' + esc(r.loc) + '</span></td>' + weeks.map(function (w) {
+      var a = Core.effAgg(M, Core.personRows(M, r.name, w, w + 7));
+      return '<td class="h" style="background:' + heat(a.eff) + '" title="' + esc(r.name + ', week of ' + fd(w) + ': ' + pct(a.eff) + ' (' + fh(a.tot) + ' hrs)') + '">' + (a.eff == null ? '<span class="muted">·</span>' : Math.round(a.eff * 100)) + '</td>';
+    }).join('') + '</tr>';
+  });
+  hh += '</tbody></table></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Efficiency by week</h3><div class="legend"><span><i style="background:var(--h0);height:10px"></i>&lt; ' + pct(target() - .25, 0) + '</span><span><i style="background:var(--h1);height:10px"></i>&lt; ' + pct(target() - .1, 0) + '</span><span><i style="background:var(--h2);height:10px"></i>&lt; ' + pct(target(), 0) + '</span><span><i style="background:var(--h3);height:10px"></i>≥ ' + pct(target(), 0) + '</span><span><i style="background:var(--h4);height:10px"></i>≥ ' + pct(target() + .1, 0) + '</span></div></div>' + hh + '</div></div>';
+  return h;
+}
+function kpi(l, v, d, cls) { return '<div class="kpi ' + (cls || '') + '"><div class="l">' + esc(l) + '</div><div class="v">' + v + '</div>' + (d != null ? '<div class="d">' + d + '</div>' : '') + '</div>'; }
+
+/* ---------------- WORK ORDERS ---------------- */
+var BUDGETS = ['Over Budget', 'Near Budget', 'Under Budget', 'Not Started', 'No Estimate'];
+function woFiltered(u, skip) {
+  var q = K(u.q);
+  return App.M.wos.filter(function (o) {
+    if (u.logged === 'yes' && !o.nRows) return false;
+    if (u.des && skip !== 'des' && K(o.des) !== K(u.des)) return false;
+    if (u.st && skip !== 'st' && o.st !== u.st) return false;
+    if (u.bud && skip !== 'bud' && o.budget !== u.bud) return false;
+    if (u.prog && o.prog !== u.prog) return false;
+    if (u.team && o.team !== u.team) return false;
+    if (q && (o.wo + ' ' + o.desc + ' ' + o.des + ' ' + o.orig).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+function viewWorkOrders() {
+  var M = App.M, u = App.ui.wo;
+  if (u.sel && M.woMap[u.sel]) return viewWODetail(u.sel);
+  u.logged = u.logged || 'all';
+  var list = woFiltered(u), forChips = woFiltered(u, 'bud');
+  var cnt = {}; forChips.forEach(function (o) { cnt[o.budget] = (cnt[o.budget] || 0) + 1; });
+  var stOpts = {}; M.wos.forEach(function (o) { if (o.st) stOpts[o.st] = 1; });
+  var progs = {}; M.wos.forEach(function (o) { if (o.prog) progs[o.prog] = 1; });
+  var desOpts = {}; M.wos.forEach(function (o) { if (o.des) desOpts[o.des] = 1; });
+  var h = '<div class="head"><div><h2>Work orders</h2><p class="sub">Budget = ' + fh(M.designFirst) + ' hrs for the first work point + ' + fh(M.designAdd) + ' hrs for each additional one. Designer hours count billable time on design tasks' + (M.S.rollup === 'family' ? ', rolled up across every earlier WO number.' : ', including the Original WO.') + '</p></div>' +
+    '<div class="row"><label class="f" for="woQ">Search<input type="search" id="woQ" data-f="wo.q" value="' + esc(u.q || '') + '" placeholder="WO #, description, designer"></label></div></div>';
+  h += '<div class="stack"><div class="row">' +
+    sel('woDes', 'wo.des', [['', 'All designers']].concat(Object.keys(desOpts).sort()), u.des || '', 'Designer') +
+    sel('woSt', 'wo.st', [['', 'All statuses']].concat(Object.keys(stOpts).sort()), u.st || '', 'WO status') +
+    sel('woProg', 'wo.prog', [['', 'All programs']].concat(Object.keys(progs).sort()), u.prog || '', 'Program') +
+    sel('woTeam', 'wo.team', [['', 'All teams']].concat(locations()), u.team || '', 'Team') +
+    sel('woLog', 'wo.logged', [['all', 'All work orders'], ['yes', 'With time logged']], u.logged, 'Show') + '</div>';
+  h += '<div class="chips">' + '<button class="chip' + (!u.bud ? ' on' : '') + '" data-act="bud" data-v="">All <b>' + forChips.length + '</b></button>' +
+    BUDGETS.map(function (b) { var t = budgetTone(b); return '<button class="chip' + (u.bud === b ? ' on' : '') + '" data-act="bud" data-v="' + esc(b) + '">' + (t ? '<span class="dot" style="background:var(--' + t + ')"></span>' : '') + esc(b) + ' <b>' + (cnt[b] || 0) + '</b></button>'; }).join('') + '</div>';
+  var remain = sum(list.filter(function (o) { return o.remain > 0; }), function (o) { return o.remain; });
+  var overH = sum(list, function (o) { return o.over; });
+  h += '<div class="kpis">' + kpi('Work orders', list.length) + kpi('Estimated design hrs', fh(sum(list, function (o) { return o.est; }), 0)) + kpi('Designer hrs used', fh(sum(list, function (o) { return o.desH; }), 0)) +
+    kpi('Hours remaining', fh(remain, 0), 'on WOs with budget left') + kpi('Hours over budget', '<span class="' + (overH ? 'down' : '') + '">' + fh(overH, 0) + '</span>') + '</div>';
+  var cols = [
+    { k: 'wo', l: 'WO', f: function (o) { return '<span class="mono">' + esc(o.wo) + '</span>' + (o.unlisted ? ' <span class="pill">not in WO Hours</span>' : ''); } },
+    { k: 'desc', l: 'Description', wrap: 1 }, { k: 'des', l: 'Designer' },
+    { k: 'st', l: 'Status', f: function (o) { return o.st ? esc(o.st) : '<span class="muted">—</span>'; } },
+    { k: 'wp', l: 'WP', n: 1, f: function (o) { return o.wp == null ? '—' : fh(o.wp, 0); } },
+    { k: 'est', l: 'Est hrs', n: 1, f: function (o) { return fh(o.est); } },
+    { k: 'desH', l: 'Designer hrs', n: 1, f: function (o) { return fh(o.desH); } },
+    { k: 'util', l: 'Utilization', f: utilCell },
+    { k: 'budget', l: 'Budget', f: function (o) { return pill(o.budget, budgetTone(o.budget)); } },
+    { k: 'eff', l: 'WO eff.', n: 1, f: function (o) { return pct(o.eff, 0); } },
+    { k: 'last', l: 'Last charge', f: function (o) { return o.last == null ? '<span class="muted">—</span>' : fd(o.last); }, csv: function (o) { return Core.dayToISO(o.last); } },
+    { k: 'remain', l: 'Remaining', n: 1, f: function (o) { return '<span class="' + (o.remain < 0 ? 'down' : '') + '">' + fh(o.remain) + '</span>'; } },
+    { k: 'estQC', l: 'Est QC', n: 1, f: function (o) { return fh(o.estQC); } },
+    { k: 'actual', l: 'Actual hrs', n: 1, f: function (o) { return fh(o.actual); } },
+    { k: 'orig', l: 'Original WO', f: function (o) { return o.orig ? '<span class="mono">' + esc(o.orig) + '</span>' : ''; } },
+    { k: 'team', l: 'Team' }
+  ];
+  h += '<div class="panel"><div class="panel-h"><h3>' + list.length + ' work order' + (list.length === 1 ? '' : 's') + '</h3>' + csvBtn('wo') + '</div>' +
+    table('wo', cols, list, { sort: { k: 'last', asc: false }, go: function (o) { return 'wo:' + o.wo; }, limit: 150, tall: true, csv: 'work-orders' }) + '</div></div>';
+  return h;
+}
+function viewWODetail(wo) {
+  var M = App.M, u = App.ui.wo, D = Core.woDetail(M, wo, u.person || ''), o = D.wo, P = M.ds.pt, Dc = M.ds.dict;
+  var full = u.person ? Core.woDetail(M, wo, '') : D;
+  var h = '<div class="head"><div><div class="crumbs"><a href="#workorders" data-act="woBack">Work orders</a><span class="arrow">›</span><span>' + esc(wo) + '</span></div>' +
+    '<h2 class="mono" style="font-family:var(--f-display);font-size:34px">WO ' + esc(wo) + '</h2><p class="sub">' + esc(o.desc || 'No description') + '</p>' +
+    '<div class="row" style="margin-top:8px">' + (o.st ? pill(o.st, 'acc') : '') + ' ' + pill(o.budget, budgetTone(o.budget)) + ' ' + (o.prog ? pill(o.prog) : '') + (o.unlisted ? ' <span class="pill warn">not in WO Hours sheet</span>' : '') + '</div></div>' +
+    '<div class="row"><button class="btn" data-act="woBack" type="button">← All work orders</button>' + (o.wp ? '<button class="btn" data-act="toEst" data-wo="' + esc(wo) + '" type="button">Estimate this WO</button>' : '') + '</div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Est design hrs', fh(o.est)) + kpi('Designer hrs', fh(o.desH)) +
+    kpi('Remaining', '<span class="' + (o.remain < 0 ? 'down' : '') + '">' + fh(o.remain) + '</span>') + kpi('Utilization', pct(o.util, 0), o.budget) +
+    kpi('Est QC hrs', fh(o.estQC)) + kpi('Actual hrs', fh(o.actual), 'billable, all tasks') + kpi('WO efficiency', pct(o.eff), fh(o.billH) + ' billable · ' + fh(o.nonBillH) + ' non') + kpi('Over budget', '<span class="' + (o.over ? 'down' : '') + '">' + fh(o.over) + '</span>') + '</div>';
+  // budget bar
+  var max = Math.max(o.est * 1.5, o.desH * 1.05, 1);
+  h += '<div class="panel"><div class="panel-h"><h3>Designer hours against budget</h3><span class="muted">near at ' + pct(M.S.thresh.near, 0) + ', over above ' + pct(M.S.thresh.over, 0) + '</span></div>' +
+    '<div style="position:relative;height:22px;background:var(--surface-2);border-radius:4px">' +
+    '<div style="position:absolute;inset:0 auto 0 0;width:' + (o.desH / max * 100) + '%;background:var(--' + (budgetTone(o.budget) || 'accent') + ');border-radius:4px"></div>' +
+    (o.est ? '<div title="Budget" style="position:absolute;top:-4px;bottom:-4px;left:' + (o.est / max * 100) + '%;width:2px;background:var(--ink)"></div><div title="Near" style="position:absolute;top:-4px;bottom:-4px;left:' + (o.est * M.S.thresh.near / max * 100) + '%;width:1px;background:var(--ink);opacity:.4"></div>' : '') +
+    '</div><div class="row" style="justify-content:space-between;margin-top:6px;font-size:12px"><span class="muted">' + fh(o.desH) + ' hrs used</span><span class="muted">budget ' + fh(o.est) + ' hrs</span></div></div>';
+  // facts + family
+  var anc = D.ancestors, dsc = D.descendants;
+  var fam = '';
+  if (anc.length || dsc.length || o.orig) {
+    var chain = anc.slice().reverse().map(function (w) { return woLink(w); }).concat(['<b class="mono">' + esc(wo) + '</b>']).concat(dsc.map(woLink));
+    fam = '<div class="panel"><div class="panel-h"><h3>WO number history</h3><span class="muted">oldest → newest</span></div><div class="crumbs">' + chain.join('<span class="arrow">→</span>') + '</div>' +
+      (anc.map(function (w) { var r = M.famReason[wo + '|' + w]; return r ? '<p class="sub">' + esc(w) + ' → ' + esc(wo) + ': ' + esc(r) + '</p>' : ''; }).join('')) +
+      '<p class="note" style="margin-top:10px">Hours rolled into this WO: ' + o.set.map(function (w) { return '<span class="mono">' + esc(w) + '</span>'; }).join(', ') + '.' + (M.S.rollup !== 'family' && anc.length > 1 ? ' Settings can roll up the full history instead of just the Original WO.' : '') + '</p></div>';
+  }
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Summary</h3></div><dl class="dl">' +
+    dd('Designer of record', o.des ? personLink(o.des) : '—') + dd('Team', esc(o.team || '—')) + dd('Program', esc(o.prog || '—')) + dd('Project group', esc(o.grp || '—')) +
+    dd('Work points', o.wp == null ? '—' : fh(o.wp, 0)) + dd('Target start', fd(o.tsd)) + dd('First charge', fd(o.first)) + dd('Last charge', fd(o.last)) +
+    dd('Cost estimate', o.cost == null ? '—' : '$' + fh(o.cost, 0)) + dd('Man-hours (Entergy)', o.mh == null ? '—' : fh(o.mh)) + dd('Sent to QAQC', fd(o.sent)) + dd('QA/QC', esc(o.qa || '—')) + dd('Original WO', o.orig ? woLink(o.orig) : '—') + dd('QC reviews', o.qcCount) +
+    '</dl></div>' + (fam || '<div class="panel"><div class="panel-h"><h3>WO number history</h3></div><p class="muted">This work order has not been re-numbered.</p></div>') + '</div>';
+  // person filter + tasks
+  var plist = full.people.map(function (p) { return p.name; });
+  var taskCols = [{ k: 'task', l: 'Task' }, { k: 'b', l: 'Billable', n: 1, f: function (r) { return fh(r.b); } }, { k: 'n', l: 'Non-billable', n: 1, f: function (r) { return fh(r.n); } },
+    { k: 'tot', l: 'Total', n: 1, v: function (r) { return r.b + r.n + r.other; }, f: function (r) { return fh(r.b + r.n + r.other); } }, { k: 'prod', l: 'Production', n: 1, f: function (r) { return r.prod ? fh(r.prod) : '<span class="muted">—</span>'; } }];
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Task split</h3>' + sel('woPerson', 'wo.person', [['', 'Everyone']].concat(plist), u.person || '', 'Person') + '</div>' +
+    table('wotask', taskCols, D.tasks, { csv: 'wo-' + wo + '-tasks', foot: ['Total', fh(D.billH), fh(D.nonBillH), fh(sum(D.tasks, function (r) { return r.b + r.n + r.other; })), fh(sum(D.tasks, function (r) { return r.prod; }))] }) +
+    '<p class="sub" style="margin-top:8px">Efficiency for ' + esc(u.person || 'everyone') + ': <b>' + pct(D.eff) + '</b></p></div>';
+  var pcols = [{ k: 'name', l: 'Person', f: function (r) { return personLink(r.name); }, csv: function (r) { return r.name; } }, { k: 'h', l: 'Hours', n: 1, f: function (r) { return fh(r.h); } }, { k: 'b', l: 'Billable', n: 1, f: function (r) { return fh(r.b); } },
+    { k: 'prod', l: 'Production', n: 1, f: function (r) { return r.prod ? fh(r.prod) : '—'; } }, { k: 'first', l: 'First', f: function (r) { return fd(r.first, false); } }, { k: 'last', l: 'Last', f: function (r) { return fd(r.last, false); } }];
+  h += '<div class="panel"><div class="panel-h"><h3>Who worked on it</h3></div>' + table('wopeople', pcols, full.people, { csv: 'wo-' + wo + '-people' }) + '</div></div>';
+  // weekly chart
+  if (D.weeks.length) {
+    var w0 = D.weeks[0][0], w1 = D.weeks[D.weeks.length - 1][0], wk = [], map = {}; D.weeks.forEach(function (x) { map[x[0]] = x[1]; });
+    for (var w = w0; w <= w1; w += 7) wk.push(w);
+    h += '<div class="panel"><div class="panel-h"><h3>Hours by week</h3><span class="muted">' + esc(u.person || 'everyone') + '</span></div>' + barChart({ labels: wk.map(fdShort), series: [{ name: 'Hours', color: 'var(--accent)', values: wk.map(function (w) { return map[w] || 0; }) }], h: 180, title: 'Hours by week' }) + '</div>';
+  }
+  if (D.scorecards.length) {
+    h += '<div class="panel"><div class="panel-h"><h3>QC reviews</h3></div>' + table('woqc', [
+      { k: 'd', l: 'Date', f: function (s) { return fd(s.d); } }, { k: 'des', l: 'Designer' }, { k: 'tech', l: 'QC technician' }, { k: 'ver', l: 'Version', n: 1 },
+      { k: 'pf', l: 'Pole Foreman', n: 1, f: function (s) { return pct(s.pf, 0); } }, { k: 'gdt', l: 'GDT', n: 1, f: function (s) { return pct(s.gdt, 0); } }, { k: 'del', l: 'Deliverable', n: 1, f: function (s) { return pct(s.del, 0); } },
+      { k: 'ov', l: 'Overall', n: 1, f: function (s) { return pct(s.ov, 1); } }, { k: 'g', l: 'Grade', v: function (s) { return s.ov; }, f: function (s) { return gradeBox(Core.grade(s.ov)); } }], D.scorecards, { sort: { k: 'd', asc: false } }) + '</div>';
+  }
+  // entries
+  var ent = D.rows.slice().reverse().map(function (i) { return { i: i, d: P.d[i], p: Dc.p[P.n[i]], w: Dc.w[P.w[i]], t: Dc.t[P.t[i]], h: P.h[i], pr: P.p[i], b: P.b[i], s: Dc.s[P.s[i]], note: P.notes[i] || '' }; });
+  h += '<div class="panel"><div class="panel-h"><h3>Time entries</h3>' + csvBtn('woent') + '</div>' + table('woent', [
+    { k: 'd', l: 'Date', f: function (r) { return fd(r.d); }, csv: function (r) { return Core.dayToISO(r.d); } }, { k: 'p', l: 'Person' }, { k: 'w', l: 'WO', f: function (r) { return '<span class="mono">' + esc(r.w) + '</span>'; } }, { k: 't', l: 'Task' },
+    { k: 'h', l: 'Hours', n: 1, f: function (r) { return fh(r.h); } }, { k: 'pr', l: 'Prod.', n: 1, f: function (r) { return r.pr ? fh(r.pr) : ''; } },
+    { k: 'b', l: 'Billable', f: function (r) { return r.b === 1 ? 'Billable' : r.b === 0 ? '<span class="muted">Not billable</span>' : '<span class="flag">blank</span>'; }, csv: function (r) { return r.b === 1 ? 'Billable' : r.b === 0 ? 'Not Billable' : ''; } },
+    { k: 's', l: 'Status' }, { k: 'note', l: 'Notes', wrap: 1 }], ent, { limit: 100, tall: true, csv: 'wo-' + wo + '-entries' }) + '</div></div>';
+  return h;
+}
+function dd(l, v) { return '<div><dt>' + esc(l) + '</dt><dd>' + v + '</dd></div>'; }
+
+/* ---------------- DESIGNERS ---------------- */
+function viewDesigners() {
+  var M = App.M, u = App.ui.des;
+  var names = people();
+  if (!u.name || M.pIdx[K(u.name)] == null && !M.scByDes[K(u.name)]) {
+    var recent = Core.peopleInRange(M, M.maxDay - 14, M.maxDay + 1).filter(isDesigner).sort();
+    u.name = recent[0] || names[0];
+  }
+  var name = u.name, e = emp(name) || {}, asOf = M.maxDay;
+  var all = Core.effAgg(M, Core.personRows(M, name)), r30 = Core.effAgg(M, Core.personRows(M, name, asOf - 29, asOf + 1));
+  var q = Core.qcSummary(M, name);
+  var dayN = e.start != null ? asOf - e.start + 1 : null;
+  var desOpts = names.map(function (n) { return [n, n + (isDesigner(n) ? '' : emp(n) ? ' (' + emp(n).task + ')' : ' (not on Employee List)')]; });
+  var h = '<div class="head"><div><h2>' + esc(name) + '</h2><p class="sub">' + esc([e.loc, e.task, e.rep ? 'reports to ' + e.rep : ''].filter(Boolean).join(' · ') || 'Not on the Employee List') + '</p></div>' +
+    '<div class="row">' + sel('desName', 'des.name', desOpts, name, 'Designer') + '</div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Start date', e.start != null ? fd(e.start) : '—', dayN != null ? 'day ' + dayN : '') + kpi('Total hours', fh(all.tot, 0), 'all time') +
+    kpi('Efficiency, 30 days', '<span style="color:var(--' + (effTone(r30.eff) || 'ink') + ')">' + pct(r30.eff) + '</span>', 'through ' + fd(asOf, false)) + kpi('Efficiency, all time', pct(all.eff)) +
+    kpi('Avg QC score', pct(q.ov), q.n + ' review' + (q.n === 1 ? '' : 's')) + kpi('QC grade', gradeBox(q.grade), q.trend > 0 ? '<span class="up">▲ improving</span>' : q.trend < 0 ? '<span class="down">▼ slipping</span>' : 'steady') + '</div>';
+  // trend
+  var ws = Core.weekStart(asOf), weeks = []; for (var w = ws - 11 * 7; w <= ws; w += 7) weeks.push(w);
+  var mine = weeks.map(function (w) { return Core.effAgg(M, Core.personRows(M, name, w, w + 7)).eff; });
+  var team = weeks.map(function (w) { var ag = effPeople(w, { role: 'design', loc: 'all' }).map(function (p) { return Core.effAgg(M, Core.personRows(M, p, w, w + 7)); }); var b = sum(ag, function (r) { return r.b; }), n = sum(ag, function (r) { return r.n; }); return b + n ? b / (b + n) : null; });
+  var hrs = weeks.map(function (w) { return Core.effAgg(M, Core.personRows(M, name, w, w + 7)).tot; });
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Weekly efficiency</h3><span class="muted">last 12 weeks</span></div>' + lineChart({ labels: weeks.map(fdShort), series: [{ name: name, color: 'var(--accent)', values: mine }, { name: 'Design team', color: 'var(--muted)', values: team, dash: '5 4', w: 1.5 }], yMin: 0, yMax: 1, yFmt: function (v) { return Math.round(v * 100) + '%'; }, target: target() }) + '</div>' +
+    '<div class="panel"><div class="panel-h"><h3>Hours logged per week</h3></div>' + barChart({ labels: weeks.map(fdShort), series: [{ name: 'Hours', color: 'var(--copper)', values: hrs }], title: 'Hours per week' }) + '</div></div>';
+  // cohort
+  if (e.start != null) {
+    var cohort = M.ds.emp.filter(function (x) { return x.start != null && Math.abs(x.start - e.start) <= 30; }).map(function (x) {
+      var a = Core.effAgg(M, Core.personRows(M, x.name)), b = Core.effAgg(M, Core.personRows(M, x.name, asOf - 29, asOf + 1)), qq = Core.qcSummary(M, x.name);
+      return { name: x.name, loc: x.loc, start: x.start, tot: a.tot, eff30: b.eff, effAll: a.eff, n: qq.n, ov: qq.ov, g: qq.grade, me: K(x.name) === K(name) };
+    });
+    h += '<div class="panel"><div class="panel-h"><h3>Peer cohort</h3><span class="muted">started within 30 days of ' + esc(name.split(' ')[0]) + ' (' + fd(e.start) + ')</span></div>' + table('cohort', [
+      { k: 'name', l: 'Designer', f: function (r) { return (r.me ? '<b>★ ' + esc(r.name) + '</b>' : personLink(r.name)); } }, { k: 'loc', l: 'Location' }, { k: 'start', l: 'Start', f: function (r) { return fd(r.start); } },
+      { k: 'tot', l: 'Total hrs', n: 1, f: function (r) { return fh(r.tot, 0); } }, { k: 'eff30', l: 'Eff. 30 days', f: function (r) { return effCell(r.eff30); } }, { k: 'effAll', l: 'Eff. all time', n: 1, f: function (r) { return pct(r.effAll); } },
+      { k: 'n', l: 'QC reviews', n: 1 }, { k: 'ov', l: 'Avg QC', n: 1, f: function (r) { return pct(r.ov); } }, { k: 'g', l: 'Grade', v: function (r) { return r.ov; }, f: function (r) { return gradeBox(r.g); } }], cohort, { sort: { k: 'eff30', asc: false } }) + '</div>';
+  }
+  // QC history + hours by WO
+  var byWO = {}, P = M.ds.pt;
+  Core.personRows(M, name).forEach(function (i) { var w = M.ds.dict.w[P.w[i]] || '(none)'; byWO[w] = byWO[w] || { wo: w, h: 0, last: 0 }; byWO[w].h += P.h[i]; byWO[w].last = Math.max(byWO[w].last, P.d[i]); });
+  var qcWOs = {}; q.list.forEach(function (s) { qcWOs[s.wo] = 1; });
+  var wl = Object.keys(byWO).map(function (k) { var r = byWO[k], o = M.woMap[k]; r.pct = all.tot ? r.h / all.tot : 0; r.qc = !!qcWOs[k]; r.budget = o ? o.budget : ''; r.st = o ? o.st : ''; r.label = k === Core.OH ? 'Overhead' : k === Core.TR ? 'Training' : ''; return r; });
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>QC history</h3></div>' + table('desqc', [
+    { k: 'd', l: 'Date', f: function (s) { return fd(s.d); } }, { k: 'wo', l: 'WO', f: function (s) { return woLink(s.wo); } }, { k: 'tech', l: 'QC tech' },
+    { k: 'pf', l: 'PF', n: 1, f: function (s) { return pct(s.pf, 0); } }, { k: 'gdt', l: 'GDT', n: 1, f: function (s) { return pct(s.gdt, 0); } }, { k: 'del', l: 'Deliv.', n: 1, f: function (s) { return pct(s.del, 0); } },
+    { k: 'ov', l: 'Overall', n: 1, f: function (s) { return pct(s.ov, 1); } }, { k: 'g', l: 'Grade', v: function (s) { return s.ov; }, f: function (s) { return gradeBox(Core.grade(s.ov)); } }], q.list, { sort: { k: 'd', asc: false }, empty: 'No QC reviews yet.', tall: true }) + '</div>' +
+    '<div class="panel"><div class="panel-h"><h3>Hours by work order</h3>' + csvBtn('deswo') + '</div>' + table('deswo', [
+      { k: 'wo', l: 'WO', f: function (r) { return r.label ? '<span class="mono">' + esc(r.wo) + '</span> <span class="muted">' + r.label + '</span>' : woLink(r.wo); } }, { k: 'h', l: 'Hours', n: 1, f: function (r) { return fh(r.h); } },
+      { k: 'pct', l: '% of total', n: 1, f: function (r) { return pct(r.pct); } }, { k: 'qc', l: 'QC', v: function (r) { return r.qc ? 1 : 0; }, f: function (r) { return r.label ? '' : r.qc ? pill("QC'd", 'good') : pill("Not QC'd"); } },
+      { k: 'budget', l: 'Budget', f: function (r) { return r.budget ? pill(r.budget, budgetTone(r.budget)) : ''; } }, { k: 'last', l: 'Last charge', f: function (r) { return fd(r.last, false); } }], wl, { sort: { k: 'h', asc: false }, tall: true, csv: 'hours-by-wo-' + name }) + '</div></div></div>';
+  return h;
+}
+
+/* ---------------- QC ---------------- */
+function viewQC() {
+  var M = App.M, u = App.ui.qc; u.loc = u.loc || 'all';
+  var names = {}; Core.qcDesigners(M).forEach(function (n) { names[n] = 1; }); M.ds.emp.forEach(function (e) { if (K(e.task) === 'design') names[e.name] = 1; });
+  var rows = Object.keys(names).filter(function (n) { return locOk(n, u.loc); }).map(function (n) { var q = Core.qcSummary(M, n), e = emp(n) || {}; q.loc = e.loc || ''; q.start = e.start; q.last = q.list.reduce(function (m, s) { return Math.max(m, s.d || 0); }, 0) || null; return q; });
+  var reviews = M.ds.sc.filter(function (s) { return locOk(s.des, u.loc); });
+  var avgAll = Core.avg(reviews.map(function (s) { return s.ov; }));
+  var top = rows.filter(function (r) { return r.n >= 3 && r.ov != null; }).sort(function (a, b) { return b.ov - a.ov; })[0];
+  var months = {}; reviews.forEach(function (s) { if (s.d == null) return; var t = new Date(s.d * 864e5), k = t.getUTCFullYear() * 12 + t.getUTCMonth(); (months[k] || (months[k] = [])).push(s.ov); });
+  var mk = Object.keys(months).map(Number).sort(function (a, b) { return a - b; });
+  var techs = {}; reviews.forEach(function (s) { var t = s.tech || '(blank)'; (techs[t] || (techs[t] = [])).push(s.ov); });
+  var h = '<div class="head"><div><h2>QC scorecards</h2><p class="sub">Grades: A+ ≥ 95%, A ≥ 90, A- ≥ 85, B+ ≥ 80, B ≥ 75, B- ≥ 70, C+ ≥ 65, C ≥ 60, C- ≥ 55, D ≥ 50, F below. Trend compares the last 60 days of reviews with each designer\'s overall average (±2 pts).</p></div>' +
+    '<div class="row">' + sel('qcLoc', 'qc.loc', [['all', 'All locations']].concat(locations()), u.loc, 'Location') + '</div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Avg overall score', pct(avgAll), gradeBox(Core.grade(avgAll)), 'hero') + kpi('QC reviews', reviews.length) +
+    kpi('Designers reviewed', rows.filter(function (r) { return r.n; }).length) + kpi('Top performer', top ? esc(top.name) : '—', top ? pct(top.ov) + ' over ' + top.n + ' reviews' : 'needs 3+ reviews') + '</div>';
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Average score by month</h3></div>' + lineChart({ labels: mk.map(function (k) { return MON[k % 12] + ' ' + String(Math.floor(k / 12)).slice(2); }), series: [{ name: 'Avg overall', color: 'var(--accent)', values: mk.map(function (k) { return Core.avg(months[k]); }) }], yMin: 0, yMax: 1, yFmt: function (v) { return Math.round(v * 100) + '%'; }, area: true }) + '</div>' +
+    '<div class="panel"><div class="panel-h"><h3>By QC technician</h3></div>' + table('qctech', [{ k: 'tech', l: 'Technician' }, { k: 'n', l: 'Reviews', n: 1 }, { k: 'avg', l: 'Avg score given', n: 1, f: function (r) { return pct(r.avg); } }],
+      Object.keys(techs).map(function (t) { return { tech: t, n: techs[t].length, avg: Core.avg(techs[t]) }; }), { sort: { k: 'n', asc: false } }) + '</div></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Designer ranking</h3>' + csvBtn('qc') + '</div>' + table('qc', [
+    { k: 'loc', l: 'Location' }, { k: 'start', l: 'Start', f: function (r) { return fd(r.start); }, csv: function (r) { return Core.dayToISO(r.start); } }, { k: 'name', l: 'Designer', f: function (r) { return personLink(r.name); }, csv: function (r) { return r.name; } },
+    { k: 'n', l: 'Reviews', n: 1 }, { k: 'pf', l: 'Avg PF', n: 1, f: function (r) { return pct(r.pf); } }, { k: 'gdt', l: 'Avg GDT', n: 1, f: function (r) { return pct(r.gdt); } }, { k: 'del', l: 'Avg Deliv.', n: 1, f: function (r) { return pct(r.del); } },
+    { k: 'ov', l: 'Avg overall', f: function (r) { return r.ov == null ? '<span class="muted">no reviews</span>' : '<div class="mcell">' + meter(r.ov, 1, { color: 'var(--' + (gradeTone(r.grade) === 'acc' ? 'accent' : gradeTone(r.grade) || 'accent') + ')' }) + '<span>' + pct(r.ov) + '</span></div>'; } },
+    { k: 'grade', l: 'Grade', v: function (r) { return r.ov; }, f: function (r) { return gradeBox(r.grade); } },
+    { k: 'trend', l: 'Trend', f: function (r) { return !r.n ? '' : r.trend > 0 ? '<span class="up">▲</span>' : r.trend < 0 ? '<span class="down">▼</span>' : '<span class="muted">●</span>'; }, csv: function (r) { return r.trend; } },
+    { k: 'last', l: 'Last review', f: function (r) { return fd(r.last); }, csv: function (r) { return Core.dayToISO(r.last); } }], rows, { sort: { k: 'ov', asc: false }, go: function (r) { return 'des:' + r.name; }, csv: 'qc-ranking' }) + '</div></div>';
+  return h;
+}
+
+/* ---------------- PRODUCTION ---------------- */
+function viewProduction() {
+  var M = App.M, u = App.ui.prod, wp = Core.weeklyProduction(M);
+  if (!wp.length) return '<div class="empty">No production data on or after ' + fd(M.S.prodStart) + '.</div>';
+  if (u.week == null || u.week > M.maxDay || u.week < M.S.prodStart) u.week = wp[wp.length - 1].start;
+  var ws = +u.week, hi = wp.findIndex(function (w) { return w.start === ws; });
+  var tPF = sum(wp, function (w) { return w.pf; }), tG = sum(wp, function (w) { return w.gdt; });
+  var h = '<div class="head"><div><h2>Production</h2><p class="sub">Work points completed in Pole Foreman and GDT each week since ' + fd(M.S.prodStart) + '. Pick a week to see each designer\'s output and where their hours went.</p></div>' +
+    '<div class="row">' + sel('prodWeek', 'prod.week', wp.slice().reverse().map(function (w) { return [w.start, 'Week ' + w.n + ' · ' + fd(w.start, false) + ' – ' + fd(w.start + 6, false)]; }), ws, 'Week') + '</div></div>';
+  var cur = wp[hi] || { pf: 0, gdt: 0 };
+  h += '<div class="stack"><div class="kpis">' + kpi('PF work points, this week', fh(cur.pf, 0), '', 'hero') + kpi('GDT work points, this week', fh(cur.gdt, 0)) + kpi('PF since ' + fd(M.S.prodStart, false), fh(tPF, 0)) + kpi('GDT since ' + fd(M.S.prodStart, false), fh(tG, 0)) +
+    kpi('Weekly average (PF + GDT)', fh((tPF + tG) / wp.length, 0)) + '</div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Work points completed per week</h3></div>' + barChart({ labels: wp.map(function (w) { return 'W' + w.n; }), hi: hi, series: [{ name: 'Pole Foreman', color: 'var(--accent)', values: wp.map(function (w) { return w.pf; }) }, { name: 'GDT', color: 'var(--copper)', values: wp.map(function (w) { return w.gdt; }) }], h: 240 }) + '</div>';
+  var list = Core.peopleInRange(M, ws, ws + 7).filter(function (p) { return isDesigner(p) || !emp(p); });
+  M.ds.emp.forEach(function (e) { if (K(e.task) === 'design' && list.indexOf(e.name) < 0 && (e.start == null || e.start <= ws + 6)) list.push(e.name); });
+  var rows = list.map(function (p) { var r = Core.designerWeek(M, p, ws); r.name = p; r.loc = (emp(p) || {}).loc || ''; return r; });
+  h += '<div class="panel"><div class="panel-h"><h3>Designers, ' + fd(ws, false) + ' – ' + fd(ws + 6, false) + '</h3>' + csvBtn('prod') + '</div>' + table('prod', [
+    { k: 'name', l: 'Designer', f: function (r) { return personLink(r.name); }, csv: function (r) { return r.name; } }, { k: 'loc', l: 'Location' },
+    { k: 'prodPF', l: 'PF prod.', n: 1, f: function (r) { return fh(r.prodPF); } }, { k: 'prodGDT', l: 'GDT prod.', n: 1, f: function (r) { return fh(r.prodGDT); } },
+    { k: 'wpPerHr', l: 'WP / hr', n: 1, f: function (r) { return r.wpPerHr == null ? '—' : fh(r.wpPerHr); } },
+    { k: 'scope', l: 'Scope & setup', n: 1, f: function (r) { return fh(r.scope); } }, { k: 'pfH', l: 'PF hrs', n: 1, f: function (r) { return fh(r.pfH); } }, { k: 'gdtH', l: 'GDT hrs', n: 1, f: function (r) { return fh(r.gdtH); } },
+    { k: 'maxH', l: 'Maximo/Deliv. hrs', n: 1, f: function (r) { return fh(r.maxH); } }, { k: 'qaqc', l: 'QAQC corr. hrs', n: 1, f: function (r) { return fh(r.qaqc); } },
+    { k: 'tot', l: 'Total hrs', n: 1, f: function (r) { return fh(r.tot); } }, { k: 'left', l: 'Hrs left in design', n: 1, f: function (r) { return fh(r.left); } }], rows,
+    { sort: { k: 'prodPF', asc: false }, go: function (r) { return 'des:' + r.name; }, csv: 'production-' + Core.dayToISO(ws),
+      foot: ['Total', '', fh(sum(rows, function (r) { return r.prodPF; })), fh(sum(rows, function (r) { return r.prodGDT; })), '', fh(sum(rows, function (r) { return r.scope; })), fh(sum(rows, function (r) { return r.pfH; })), fh(sum(rows, function (r) { return r.gdtH; })), fh(sum(rows, function (r) { return r.maxH; })), fh(sum(rows, function (r) { return r.qaqc; })), fh(sum(rows, function (r) { return r.tot; })), fh(sum(rows, function (r) { return r.left; }))] }) +
+    '<p class="sub" style="margin-top:8px">Phase hours count billable time only; QAQC corrections and total count all hours. "Hrs left in design" is the remaining budget on this designer\'s WOs with status In Design.</p></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Weekly totals</h3>' + csvBtn('prodw') + '</div>' + table('prodw', [{ k: 'n', l: 'Week', n: 1 }, { k: 'start', l: 'Week start', f: function (w) { return fd(w.start); }, csv: function (w) { return Core.dayToISO(w.start); } },
+    { k: 'pf', l: 'PF work points', n: 1, f: function (w) { return fh(w.pf); } }, { k: 'gdt', l: 'GDT work points', n: 1, f: function (w) { return fh(w.gdt); } }], wp, { sort: { k: 'n', asc: false }, csv: 'weekly-production' }) + '</div></div>';
+  return h;
+}
+
+/* ---------------- TASKS ---------------- */
+function viewTasks() {
+  var M = App.M, u = App.ui.tasks, P = M.ds.pt, Dc = M.ds.dict;
+  u.kw = u.kw && u.kw.length ? u.kw : Core.KEYWORDS.slice();
+  var dsel = u.des || '', tsel = u.task || '', wsel = u.wo || '';
+  var base = Core.taskObs(M, function (i, t, w, p) { return (!dsel || K(p) === K(dsel)) && (!tsel || K(t) === K(tsel)) && (!wsel || w === wsel); });
+  var tot = sum(base, function (o) { return o.h; });
+  var taskNames = {}; Dc.t.forEach(function (t) { if (t.trim()) taskNames[t.trim()] = 1; });
+  var h = '<div class="head"><div><h2>Task time</h2><p class="sub">One observation is one designer working one task on one work order. Use the filters to compare how long the same task takes different people.</p></div>' +
+    '<div class="row">' + sel('tDes', 'tasks.des', [['', 'All designers']].concat(people()), dsel, 'Designer') + sel('tTask', 'tasks.task', [['', 'All tasks']].concat(Object.keys(taskNames).sort()), tsel, 'Task') +
+    '<label class="f" for="tWo">WO #<input type="search" id="tWo" data-f="tasks.wo" value="' + esc(wsel) + '" placeholder="All WOs" style="min-width:120px;width:140px"></label></div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Matching WO / task observations', base.length) + kpi('Total hours in selection', fh(tot, 1)) + kpi('Avg hrs per WO / task', fh(base.length ? tot / base.length : null)) + '</div>';
+  // designer comparison (ignores designer filter)
+  var cmp = Core.taskObs(M, function (i, t, w) { return (!tsel || K(t) === K(tsel)) && (!wsel || w === wsel); });
+  var byP = {}; cmp.forEach(function (o) { var r = byP[o.p] || (byP[o.p] = { p: o.p, n: 0, h: 0 }); r.n++; r.h += o.h; });
+  var pr = Object.keys(byP).map(function (k) { var r = byP[k]; r.avg = r.h / r.n; r.me = dsel && K(r.p) === K(dsel); return r; });
+  var allAvg = cmp.length ? sum(cmp, function (o) { return o.h; }) / cmp.length : null;
+  // task breakdown (ignores task filter)
+  var tb = Core.taskObs(M, function (i, t, w, p) { return (!dsel || K(p) === K(dsel)) && (!wsel || w === wsel); });
+  var byT = {}; tb.forEach(function (o) { var r = byT[o.t] || (byT[o.t] = { t: o.t, n: 0, h: 0 }); r.n++; r.h += o.h; });
+  var tr = Object.keys(byT).map(function (k) { var r = byT[k]; r.avg = r.h / r.n; return r; }).sort(function (a, b) { return b.h - a.h; }).slice(0, 30);
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Designer comparison</h3><span class="muted">' + esc(tsel || 'all tasks') + ' · overall avg ' + fh(allAvg) + ' hrs</span></div>' + table('tcmp', [
+    { k: 'p', l: 'Designer', f: function (r) { return r.me ? '<b>★ ' + esc(r.p) + '</b>' : esc(r.p); } }, { k: 'n', l: '# obs', n: 1 }, { k: 'h', l: 'Total hrs', n: 1, f: function (r) { return fh(r.h, 1); } },
+    { k: 'avg', l: 'Avg hrs / WO', f: function (r) { return '<div class="mcell">' + meter(r.avg, Math.max.apply(null, pr.map(function (x) { return x.avg; })) || 1, { color: r.avg > allAvg * 1.25 ? 'var(--warn)' : 'var(--accent)', marks: allAvg ? [allAvg] : [] }) + '<span>' + fh(r.avg) + '</span></div>'; } }], pr,
+    { sort: { k: 'avg', asc: false }, tall: true, csv: 'task-designer-comparison' }) + '</div>' +
+    '<div class="panel"><div class="panel-h"><h3>Top 30 tasks by hours</h3><span class="muted">' + esc(dsel || 'all designers') + '</span></div>' + table('ttop', [
+      { k: 't', l: 'Task' }, { k: 'n', l: '# obs', n: 1 }, { k: 'h', l: 'Total hrs', n: 1, f: function (r) { return fh(r.h, 1); } }, { k: 'avg', l: 'Avg hrs / WO', n: 1, f: function (r) { return fh(r.avg); } }], tr,
+      { sort: { k: 'h', asc: false }, tall: true, go: function (r) { return 'task:' + r.t; }, csv: 'top-tasks' }) + '</div></div>';
+  // catch-all scan
+  var catchKeys = Core.CATCH_ALL.map(K), ent = [];
+  for (var i = 0; i < M.N; i++) {
+    if (catchKeys.indexOf(M.tkey[P.t[i]]) < 0) continue;
+    var p = Dc.p[P.n[i]], w = Dc.w[P.w[i]];
+    if (dsel && K(p) !== K(dsel)) continue; if (wsel && w !== wsel) continue;
+    ent.push(i);
+  }
+  var catchH = sum(ent, function (i) { return P.h[i]; });
+  var kws = u.kw.filter(Boolean), kwRows = kws.map(function (k) { var kk = k.toLowerCase(), n = 0, hh = 0; ent.forEach(function (i) { var note = (P.notes[i] || '').toLowerCase(); if (note.indexOf(kk) >= 0) { n++; hh += P.h[i]; } }); return { k: k, n: n, h: hh, pct: catchH ? hh / catchH : 0 }; });
+  var noNote = ent.filter(function (i) { return !P.notes[i]; }), noMatch = ent.filter(function (i) { var note = (P.notes[i] || '').toLowerCase(); return note && !kws.some(function (k) { return note.indexOf(k.toLowerCase()) >= 0; }); });
+  kwRows.push({ k: '(no note entered)', n: noNote.length, h: sum(noNote, function (i) { return P.h[i]; }), fixed: 1 });
+  kwRows.push({ k: '(note matches no keyword)', n: noMatch.length, h: sum(noMatch, function (i) { return P.h[i]; }), fixed: 1 });
+  kwRows.forEach(function (r) { r.pct = catchH ? r.h / catchH : 0; });
+  h += '<div class="panel"><div class="panel-h"><div><h3>What\'s hiding in "Other"</h3><p class="sub">Searches notes on catch-all tasks (' + esc(Core.CATCH_ALL.join(', ')) + '). ' + fh(catchH, 1) + ' hrs in ' + ent.length + ' entries. A note can match more than one keyword.</p></div></div>' +
+    '<div class="grid2"><div>' + table('kw', [{ k: 'k', l: 'Keyword', f: function (r) { return r.fixed ? '<span class="muted">' + esc(r.k) + '</span>' : esc(r.k); } }, { k: 'n', l: '# entries', n: 1 }, { k: 'h', l: 'Hours', n: 1, f: function (r) { return fh(r.h, 1); } },
+      { k: 'pct', l: '% of catch-all', f: function (r) { return '<div class="mcell">' + meter(r.pct, 1, { color: r.fixed ? 'var(--muted)' : 'var(--copper)' }) + '<span>' + pct(r.pct, 0) + '</span></div>'; } }], kwRows, {}) + '</div>' +
+    '<div><label class="f" for="kwList">Keywords (one per line)<textarea id="kwList" data-f="tasks.kwtext" rows="10" style="font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px;width:100%;resize:vertical">' + esc(u.kw.join('\n')) + '</textarea></label>' +
+    '<div class="row" style="margin-top:8px"><button class="btn" data-act="kwApply" type="button">Update scan</button><button class="btn ghost" data-act="kwReset" type="button">Reset keywords</button></div><p class="sub">Keywords are saved in this browser.</p></div></div>';
+  var drill = ent.slice().reverse().map(function (i) { return { d: P.d[i], p: Dc.p[P.n[i]], w: Dc.w[P.w[i]], t: Dc.t[P.t[i]], h: P.h[i], note: P.notes[i] || '' }; });
+  h += '<h3 style="margin:16px 0 8px">Catch-all entries, newest first</h3>' + table('kwent', [{ k: 'd', l: 'Date', f: function (r) { return fd(r.d); }, csv: function (r) { return Core.dayToISO(r.d); } }, { k: 'p', l: 'Designer' },
+    { k: 'w', l: 'WO', f: function (r) { return r.w ? woLink(r.w) : ''; } }, { k: 't', l: 'Task' }, { k: 'h', l: 'Hours', n: 1, f: function (r) { return fh(r.h); } }, { k: 'note', l: 'Note', wrap: 1, f: function (r) { return r.note ? esc(r.note) : '<span class="muted">no note</span>'; } }], drill, { limit: 100, tall: true, csv: 'catch-all-entries' }) + '</div></div>';
+  return h;
+}
+
+/* ---------------- ESTIMATOR ---------------- */
+function viewEstimator() {
+  var M = App.M, u = App.ui.est;
+  if (u.wp == null) u.wp = 15; if (u.day == null) u.day = 66; if (!u.start) u.start = Core.dayToISO(todayDay()); if (u.hpd == null) u.hpd = 8; if (u.skip == null) u.skip = true;
+  var startDay = Core.toDay(u.start) || todayDay(), wp = Math.max(0, Core.num(u.wp) || 0), dayN = Math.max(0, Core.num(u.day) || 0), hpd = Math.max(0, Core.num(u.hpd) || 0);
+  var r = Core.estimate(M, wp, dayN, startDay, hpd, u.skip === true || u.skip === 'true');
+  var desOpts = [['', 'Pick a designer (optional)']].concat(M.ds.emp.filter(function (e) { return K(e.task) === 'design' && e.start != null; }).map(function (e) { return e.name; }).sort());
+  var h = '<div class="head"><div><h2>Work order hour estimator</h2><p class="sub">How many hours should a designer need for this work order, given how far along they are in ramp-up? The schedule runs day by day: each day they work up to their daily hours, and the work they finish is worth their hours divided by the ramp multiplier for that day.</p></div></div>';
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Inputs</h3></div><div class="stack" style="gap:12px">' +
+    '<div class="row">' + sel('estDes', 'est.des', desOpts, u.des || '', 'Designer') + '<label class="f" for="estWo">Or a WO # to pull work points<input type="search" id="estWo" data-f="est.wo" value="' + esc(u.wo || '') + '" placeholder="e.g. 57651351" style="width:170px"></label></div>' +
+    '<div class="row"><label class="f" for="estWp">Work points<input type="number" min="0" step="1" id="estWp" data-f="est.wp" value="' + esc(u.wp) + '" style="width:110px"></label>' +
+    '<label class="f" for="estDay">Designer day count<input type="number" min="0" step="1" id="estDay" data-f="est.day" value="' + esc(u.day) + '" style="width:130px"></label>' +
+    '<label class="f" for="estStart">Start date<input type="date" id="estStart" data-f="est.start" value="' + esc(u.start) + '"></label>' +
+    '<label class="f" for="estHpd">Hours per day<input type="number" min="0.5" step="0.5" id="estHpd" data-f="est.hpd" value="' + esc(u.hpd) + '" style="width:110px"></label>' +
+    sel('estSkip', 'est.skip', [['true', 'Skip weekends'], ['false', 'Count weekends']], String(u.skip), 'Weekends') + '</div>' +
+    (u.des && emp(u.des) ? '<p class="sub">' + esc(u.des) + ' started ' + fd(emp(u.des).start) + ', so on ' + fd(startDay) + ' they are on day ' + (startDay - emp(u.des).start + 1) + '.</p>' : '') +
+    (u.wo ? (M.woMap[u.wo.trim()] ? '<p class="sub">WO ' + esc(u.wo) + ': ' + esc(M.woMap[u.wo.trim()].desc) + '.</p>' : '<p class="flag">WO ' + esc(u.wo) + ' was not found.</p>') : '') + '</div></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Answer</h3><span class="pill acc">ramp ×' + Core.rampMult(M.S, dayN) + ' on day ' + dayN + '</span></div><div class="kpis">' +
+    kpi('Hours to give this WO', fh(r.hours), '', 'hero') + kpi('Expected finish', fd(r.finish), r.days + ' work day' + (r.days === 1 ? '' : 's')) + kpi('Day when finished', r.finishDay == null ? '—' : r.finishDay) +
+    kpi('Fully-trained budget', fh(r.budget)) + kpi('Effective speed', r.speed == null ? '—' : '×' + fh(r.speed)) + kpi('Old flat-rate method', fh(r.flat), r.flat - r.hours > 0.01 ? '<span class="up">' + fh(r.flat - r.hours) + ' hrs less with day-by-day</span>' : '') + '</div></div></div>';
+  var res = ['PF', 'GDT', 'Corrections', 'Max/Del', 'QC', 'PC', 'PM'];
+  var rrows = res.map(function (k) { var rt = M.S.rates[k] || [0, 0]; var hrs = wp < 1 ? 0 : rt[0] + (wp - 1) * rt[1]; return { k: k, a: rt[0], b: rt[1], h: hrs, per: wp ? hrs / wp : null, design: Core.DESIGN_TASKS && ['PF', 'GDT', 'Corrections', 'Max/Del'].indexOf(k) >= 0 }; });
+  h += '<div class="grid2" style="margin-top:18px"><div class="panel"><div class="panel-h"><h3>Fully-trained hours by task, ' + fh(wp, 0) + ' WP</h3></div>' + table('estres', [
+    { k: 'k', l: 'Task', f: function (r) { return esc(r.k) + (r.design ? '' : ' <span class="muted">support</span>'); } }, { k: 'a', l: '1st WP', n: 1, f: function (r) { return fh(r.a); } }, { k: 'b', l: 'Each add\'l', n: 1, f: function (r) { return fh(r.b); } },
+    { k: 'h', l: 'Hours', n: 1, f: function (r) { return fh(r.h); } }, { k: 'per', l: 'Per WP', n: 1, f: function (r) { if (r.per == null) return '—'; var m = Math.round(r.per * 60); return Math.floor(m / 60) + 'h ' + (m % 60) + 'm'; } }], rrows,
+    { foot: ['Design total', '', '', fh(sum(rrows.filter(function (r) { return r.design; }), function (r) { return r.h; })), ''] }) +
+    '<p class="sub" style="margin-top:8px">All-in with QC, PC and PM: <b>' + fh(sum(rrows, function (r) { return r.h; })) + ' hrs</b>. Rates come from the workbook\'s WO HR Estimator or from Settings.</p></div>' +
+    '<div class="panel"><div class="panel-h"><h3>Ramp stages</h3></div>' + table('ramp', [{ k: 's', l: 'From designer day', n: 1 }, { k: 'm', l: 'Learning multiplier', n: 1, f: function (r) { return '×' + r.m; } }, { k: 'x', l: 'Time allowed', n: 1, f: function (r) { return fh(r.budget * r.m); } }],
+      M.S.ramp.map(function (x) { return { s: x[0], m: x[1], budget: r.budget }; }), {}) + '</div></div>';
+  h += '<div class="panel" style="margin-top:18px"><div class="panel-h"><h3>Day-by-day schedule</h3></div>' + table('sched', [{ k: 'day', l: 'Designer day', n: 1 }, { k: 'date', l: 'Date', f: function (s) { return fd(s.date); } }, { k: 'mult', l: 'Multiplier', n: 1, f: function (s) { return '×' + s.mult; } },
+    { k: 'leftStart', l: 'Std hrs left (start)', n: 1, f: function (s) { return fh(s.leftStart); } }, { k: 'worked', l: 'Actual hrs worked', n: 1, f: function (s) { return fh(s.worked); } }, { k: 'earned', l: 'Std hrs earned', n: 1, f: function (s) { return fh(s.earned); } },
+    { k: 'leftEnd', l: 'Std hrs left (end)', n: 1, f: function (s) { return fh(Math.max(0, s.leftEnd)); } }], r.sched, { empty: 'Enter work points and hours per day.' }) + '</div>';
+  return h;
+}
+
+/* ---------------- DATA CHECK ---------------- */
+function viewData() {
+  var M = App.M, c = M.ds.counts, checks = Core.dataChecks(M), u = App.ui.data;
+  var h = '<div class="head"><div><h2>Data check</h2><p class="sub">What the app read from ' + esc(M.ds.file || 'the workbook') + ', and things in the sheets worth cleaning up.</p></div><div class="row"><button class="btn primary" data-act="upload" type="button">Upload a newer workbook</button></div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Time entries', c.entries.toLocaleString()) + kpi('Date range', fd(c.minDay, false) + ' – ' + fd(c.maxDay)) + kpi('Registered WOs', c.wos) + kpi('QC scorecards', c.scorecards) + kpi('Employees', c.employees) + '</div>';
+  if (M.ds.warn && M.ds.warn.length) h += '<div class="note">' + M.ds.warn.map(esc).join('<br>') + '</div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Cleanup list</h3></div><div class="stack" style="gap:0">' + checks.map(function (k) {
+    var tone = k.n === 0 ? 'good' : (k.id === 'zeroh' || k.id === 'nowo') ? 'warn' : 'bad';
+    return '<div class="row" style="align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:nowrap"><div class="check-n" style="color:var(--' + tone + ')">' + k.n + '</div><div style="min-width:0;flex:1"><b>' + esc(k.label) + '</b><div class="sub">' + esc(k.hint) + '</div>' +
+      (k.list && k.list.length ? '<details style="margin-top:6px"><summary>Show ' + (k.list.length < k.n ? 'first ' + k.list.length : 'all') + '</summary><div class="list-inline">' + k.list.map(esc).join(' · ') + '</div></details>' : '') + '</div></div>';
+  }).join('') + '</div></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>How the app differs from the workbook</h3></div><ul class="sub" style="max-width:90ch;padding-left:18px;margin:0;line-height:1.7">' +
+    '<li>Task names, WO numbers and names are matched after trimming stray spaces. In the workbook, "QAQC Corrections " (with a trailing space) never counted toward designer budget hours; here it does.</li>' +
+    '<li>Time logged against WO numbers that are not in the WO Hours sheet still appears in Work Orders, marked "not in WO Hours", so no hours go missing.</li>' +
+    '<li>Efficiency includes designers with no time logged for the week, flagged, instead of a fixed roster.</li>' +
+    '<li>"Last 30 days" figures are measured back from the newest entry in the file (' + fd(c.maxDay) + '), so they do not drift when nobody uploads.</li></ul></div>';
+  if (App.caps.db) {
+    h += '<div class="panel"><div class="panel-h"><h3>Upload history</h3><button class="btn ghost" data-act="loadHist" type="button">Refresh</button></div>' + (u.hist ? table('hist', [
+      { k: 'uploadedAt', l: 'Uploaded', f: function (r) { return esc(new Date(r.uploadedAt).toLocaleString()); } }, { k: 'fileName', l: 'File' }, { k: 'who', l: 'By', f: function (r) { return esc(r.who || '—'); } },
+      { k: 'maxDay', l: 'Time through', f: function (r) { return fd(r.maxDay); } }, { k: 'entries', l: 'Entries', n: 1 },
+      { k: 'act', l: '', nosort: 1, nocsv: 1, f: function (r) { return App.meta && App.meta.assetId === r.assetId ? '<span class="pill acc">showing</span>' : '<button class="btn ghost" data-act="loadVer" data-id="' + esc(r.assetId) + '" type="button">View this version</button>'; } }], u.hist, { sort: { k: 'uploadedAt', asc: false }, empty: 'No uploads recorded yet.' }) : '<p class="muted"><span class="spinner"></span> Loading…</p>') + '</div>';
+    if (!u.hist && !u.histLoading) loadHistory();
+  }
+  return h + '</div>';
+}
+
+/* ---------------- SETTINGS ---------------- */
+function viewSettings() {
+  var M = App.M, S = M.S, wb = Core.settingsFrom(M.ds, null), can = !!App.caps.db && App.canEdit;
+  var dis = can ? '' : ' disabled';
+  var res = ['PF', 'GDT', 'Corrections', 'Max/Del', 'QC', 'PC', 'PM'];
+  var h = '<div class="head"><div><h2>Settings</h2><p class="sub">Budget rates, thresholds and the ramp schedule. They start from the values in the uploaded workbook. ' +
+    (can ? 'Changes you save apply for everyone who opens the app.' : App.caps.db ? 'Only people with edit access can change these.' : 'Saved changes stay in this browser.') + '</p></div></div>';
+  h += '<form id="setForm" class="stack"><div class="grid2"><div class="panel"><div class="panel-h"><h3>Hour rates</h3><span class="muted">hours per work point</span></div><div class="tbl-wrap"><table><thead><tr><th>Task</th><th class="n">1st WP</th><th class="n">Each add\'l</th><th class="n">Workbook</th></tr></thead><tbody>' +
+    res.map(function (k) { var r = S.rates[k] || [0, 0], w = wb.rates[k] || [0, 0]; return '<tr><td>' + esc(k) + (['QC', 'PC', 'PM'].indexOf(k) >= 0 ? ' <span class="muted">support</span>' : '') + '</td><td class="n"><input type="number" step="0.05" min="0" id="r_' + k.replace(/\W/g, '') + '_0" value="' + r[0] + '" style="width:80px"' + dis + '></td><td class="n"><input type="number" step="0.05" min="0" id="r_' + k.replace(/\W/g, '') + '_1" value="' + r[1] + '" style="width:80px"' + dis + '></td><td class="n muted">' + w[0] + ' / ' + w[1] + '</td></tr>'; }).join('') +
+    '</tbody></table></div></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Thresholds</h3></div><div class="stack" style="gap:12px">' +
+    '<div class="row"><label class="f" for="sNear">"Near Budget" at utilization ≥ (%)<input type="number" id="sNear" step="1" value="' + Math.round(S.thresh.near * 100) + '" style="width:120px"' + dis + '></label>' +
+    '<label class="f" for="sOver">"Over Budget" above (%)<input type="number" id="sOver" step="1" value="' + Math.round(S.thresh.over * 100) + '" style="width:120px"' + dis + '></label></div>' +
+    '<label class="f" for="sTarget">Efficiency target (%)<input type="number" id="sTarget" step="1" value="' + Math.round((S.effTarget || .75) * 100) + '" style="width:120px"' + dis + '></label>' +
+    '<label class="f" for="sRoll">WO roll-up<select id="sRoll"' + dis + '>' + opt('original', 'Include the Original WO from WO Hours (matches the workbook)', S.rollup) + opt('family', 'Include every earlier WO number from the WO Number Tracker', S.rollup) + '</select></label>' +
+    '<label class="f" for="sProd">Production week 1 starts<input type="date" id="sProd" value="' + Core.dayToISO(S.prodStart) + '"' + dis + '></label></div></div></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Ramp schedule</h3><span class="muted">learning multiplier by designer day</span></div><div class="row">' + S.ramp.map(function (x, i) {
+    return '<label class="f" for="rp' + i + '_0">From day<input type="number" id="rp' + i + '_0" value="' + x[0] + '" style="width:90px"' + dis + '></label><label class="f" for="rp' + i + '_1">× multiplier<input type="number" step="0.1" id="rp' + i + '_1" value="' + x[1] + '" style="width:90px"' + dis + '></label><span style="width:12px"></span>';
+  }).join('') + '</div></div>';
+  h += '<div class="row">' + (can ? '<button class="btn primary" data-act="saveSet" type="button">Save for everyone</button><button class="btn" data-act="resetSet" type="button">Use workbook values</button>' :
+    App.caps.db ? '' : '<button class="btn primary" data-act="saveSetLocal" type="button">Save in this browser</button><button class="btn" data-act="resetSetLocal" type="button">Use workbook values</button>') + '</div></form>';
+  return h;
+}
+function readSettingsForm() {
+  var res = ['PF', 'GDT', 'Corrections', 'Max/Del', 'QC', 'PC', 'PM'], rates = {};
+  res.forEach(function (k) { var id = k.replace(/\W/g, ''); rates[k] = [+$('#r_' + id + '_0').value || 0, +$('#r_' + id + '_1').value || 0]; });
+  var ramp = App.M.S.ramp.map(function (_, i) { return [+$('#rp' + i + '_0').value || 0, +$('#rp' + i + '_1').value || 1]; }).sort(function (a, b) { return a[0] - b[0]; });
+  return { rates: rates, ramp: ramp, thresh: { near: (+$('#sNear').value || 85) / 100, over: (+$('#sOver').value || 100) / 100 }, effTarget: (+$('#sTarget').value || 75) / 100, rollup: $('#sRoll').value, prodStart: Core.toDay($('#sProd').value) || Core.DEFAULTS.prodStart };
+}
+
+var VIEW_FN = { efficiency: viewEfficiency, workorders: viewWorkOrders, designers: viewDesigners, qc: viewQC, production: viewProduction, tasks: viewTasks, estimator: viewEstimator, data: viewData, settings: viewSettings };
+
+/* ---------------- events ---------------- */
+function setPath(path, val) { var p = path.split('.'); App.ui[p[0]] = App.ui[p[0]] || {}; App.ui[p[0]][p[1]] = val; }
+function go(view) { if (location.hash !== '#' + view) location.hash = view; else { App.view = view; render.nav = true; render(); } window.scrollTo(0, 0); }
+document.addEventListener('click', function (e) {
+  var t = e.target.closest('[data-des],[data-wo],[data-go],[data-sort],[data-act]'); if (!t) return;
+  if (t.hasAttribute('data-des')) { e.preventDefault(); App.ui.des.name = t.getAttribute('data-des'); go('designers'); return; }
+  if (t.hasAttribute('data-wo') && !t.hasAttribute('data-act')) { e.preventDefault(); App.ui.wo.sel = t.getAttribute('data-wo'); App.ui.wo.person = ''; go('workorders'); return; }
+  if (t.hasAttribute('data-sort')) {
+    var s = t.getAttribute('data-sort').split('|'), cur = App.sort[s[0]];
+    App.sort[s[0]] = { k: s[1], asc: cur && cur.k === s[1] ? !cur.asc : false }; render(); return;
+  }
+  if (t.hasAttribute('data-go')) {
+    if (e.target.closest('a,button')) return;
+    var g = t.getAttribute('data-go'), ix = g.indexOf(':'), kind = g.slice(0, ix), v = g.slice(ix + 1);
+    if (kind === 'des') { App.ui.des.name = v; go('designers'); }
+    else if (kind === 'wo') { App.ui.wo.sel = v; App.ui.wo.person = ''; go('workorders'); }
+    else if (kind === 'task') { App.ui.tasks.task = v; render(); }
+    return;
+  }
+  var act = t.getAttribute('data-act');
+  if (act === 'upload') $('#file').click();
+  else if (act === 'csv') exportCSV(t.getAttribute('data-id'));
+  else if (act === 'more') { App.ui['more_' + t.getAttribute('data-id')] = true; render(); }
+  else if (act === 'bud') { App.ui.wo.bud = t.getAttribute('data-v'); render(); }
+  else if (act === 'woBack') { e.preventDefault(); App.ui.wo.sel = null; render.nav = true; render(); window.scrollTo(0, 0); }
+  else if (act === 'toEst') { App.ui.est.wo = t.getAttribute('data-wo'); var o = App.M.woMap[App.ui.est.wo]; if (o) App.ui.est.wp = o.wp; go('estimator'); }
+  else if (act === 'kwApply') { App.ui.tasks.kw = $('#kwList').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); render(); }
+  else if (act === 'kwReset') { App.ui.tasks.kw = Core.KEYWORDS.slice(); render(); }
+  else if (act === 'saveSet') saveSettings(readSettingsForm());
+  else if (act === 'resetSet') saveSettings(null);
+  else if (act === 'saveSetLocal') { lsSet('settings', readSettingsForm()); App.saved = lsGet('settings', null); rebuild(); toast('Settings saved in this browser.'); }
+  else if (act === 'resetSetLocal') { lsSet('settings', null); App.saved = null; rebuild(); toast('Back to the workbook values.'); }
+  else if (act === 'loadHist') { App.ui.data.hist = null; render(); }
+  else if (act === 'loadVer') loadFromAsset({ assetId: t.getAttribute('data-id') }, true);
+});
+document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-go]')) e.target.click(); });
+var typingTimer;
+function onField(e) {
+  var t = e.target, f = t.getAttribute && t.getAttribute('data-f'); if (!f) return;
+  var v = t.value;
+  if (f === 'tasks.kwtext') return;
+  if (f === 'eff.week' || f === 'prod.week' || f === 'eff.span') v = +v;
+  setPath(f, v);
+  if (f === 'est.des' && v && emp(v)) { var sd = Core.toDay(App.ui.est.start) || todayDay(); App.ui.est.day = sd - emp(v).start + 1; }
+  if (f === 'est.start' && App.ui.est.des && emp(App.ui.est.des)) { App.ui.est.day = (Core.toDay(v) || todayDay()) - emp(App.ui.est.des).start + 1; }
+  if (f === 'est.wo') { var o = App.M.woMap[String(v).trim()]; if (o && o.wp != null) App.ui.est.wp = o.wp; }
+  if (f === 'est.skip') App.ui.est.skip = v === 'true';
+  if (f.indexOf('wo.') === 0) App.ui.more_wo = false;
+  if (e.type === 'input' && t.tagName === 'INPUT') { clearTimeout(typingTimer); typingTimer = setTimeout(render, 220); } else render();
+}
+document.addEventListener('change', function (e) { if (e.target.tagName === 'SELECT' || e.target.type === 'date') onField(e); else if (e.target.tagName === 'INPUT') onField(e); });
+document.addEventListener('input', function (e) { if (e.target.tagName === 'INPUT' && (e.target.type === 'search' || e.target.type === 'number')) onField(e); });
+window.addEventListener('hashchange', function () { var v = location.hash.slice(1); if (VIEW_FN[v]) { App.view = v; lsSet('view', v); render.nav = true; render(); window.scrollTo(0, 0); } });
+$('#uploadBtn').addEventListener('click', function () { $('#file').click(); });
+$('#file').addEventListener('change', function () { var f = this.files[0]; this.value = ''; if (f) handleFile(f); });
+
+/* ---------------- data loading, sharing, caching ---------------- */
+function idb(mode, fn) {
+  return new Promise(function (res) {
+    try {
+      var rq = indexedDB.open('pct', 1);
+      rq.onupgradeneeded = function () { rq.result.createObjectStore('kv'); };
+      rq.onsuccess = function () { try { var tx = rq.result.transaction('kv', mode), st = tx.objectStore('kv'), r = fn(st); tx.oncomplete = function () { res(r && r.result); }; tx.onerror = function () { res(null); }; } catch (e) { res(null); } };
+      rq.onerror = function () { res(null); };
+    } catch (e) { res(null); }
+  });
+}
+function cacheGet() { return idb('readonly', function (st) { return st.get('current'); }); }
+function cacheSet(v) { return idb('readwrite', function (st) { st.put(v, 'current'); }); }
+function rebuild() { if (!App.ds) return; try { App.M = Core.buildModel(App.ds, App.saved); } catch (e) { console.error(e); toast('Could not rebuild: ' + e.message); } render(); }
+function useDataset(ds, meta) { App.ds = ds; App.meta = meta; App.M = null; rebuild(); resolveUploader(); }
+function resolveUploader() {
+  var m = App.meta; if (!m || !m.uploadedBy || !App.caps.user || m.uploaderName) return;
+  try { App.caps.user.profiles([m.uploadedBy]).then(function (ps) { var p = ps && ps[m.uploadedBy]; if (p && p.name && App.meta === m) { m.uploaderName = p.name; renderInfo(); } }).catch(function () {}); } catch (e) {}
+}
+function handleFile(file) {
+  if (typeof XLSX === 'undefined') { toast('The spreadsheet reader did not load. Check your connection and reload.'); return; }
+  toast('Reading ' + file.name + '…', 60000);
+  var fr = new FileReader();
+  fr.onload = function () {
+    setTimeout(function () {
+      var ds;
+      try { ds = Core.parseWorkbook(XLSX, new Uint8Array(fr.result), file.name); }
+      catch (e) { console.error(e); toast(e.message || 'That file could not be read as a workbook.', 8000); return; }
+      var meta = { fileName: file.name, uploadedAt: new Date().toISOString(), uploadedBy: App.uid || null, local: true, maxDay: ds.counts.maxDay, entries: ds.counts.entries };
+      useDataset(ds, meta);
+      cacheSet({ ds: ds, meta: meta });
+      shareDataset(ds, meta);
+    }, 30);
+  };
+  fr.onerror = function () { toast('That file could not be opened.'); };
+  fr.readAsArrayBuffer(file);
+}
+function shareDataset(ds, meta) {
+  var A = App.caps.assets, db = App.caps.db;
+  if (!A || !db || !App.canEdit) { toast('Loaded ' + ds.counts.entries.toLocaleString() + ' entries. This upload is only on this device.', 6000); return; }
+  toast('Sharing the new data with your team…', 60000);
+  var blob = new Blob([JSON.stringify(ds)], { type: 'application/json' });
+  A.upload(blob, { type: 'application/json' }).then(function (r) {
+    var doc = { assetId: r.id, fileName: meta.fileName, uploadedAt: meta.uploadedAt, uploadedBy: App.uid || null, maxDay: ds.counts.maxDay, entries: ds.counts.entries };
+    pendingAsset = r.id;
+    return db.doc('meta/current').set(doc).then(function () { return db.collection('uploads').doc(r.id).set(doc); }).then(function () {
+      meta.local = false; meta.assetId = r.id; App.meta = Object.assign(meta, doc); cacheSet({ ds: ds, meta: App.meta }); renderInfo(); resolveUploader();
+      toast('Uploaded. Everyone who opens the app now sees this data.', 5000);
+    });
+  }).catch(function (e) { console.error(e); toast(e && e.code === 'too_large' ? 'The workbook data is too large to share (20 MB limit). It is loaded on this device only.' : 'Loaded here, but sharing failed (' + (e && e.code || 'error') + '). Try uploading again.', 8000); });
+}
+var pendingAsset = null, loadingAsset = null;
+function loadFromAsset(m, explicit) {
+  if (!m || !m.assetId || loadingAsset === m.assetId) return Promise.resolve();
+  loadingAsset = m.assetId;
+  if (explicit) toast('Loading that version…', 30000);
+  return fetch('/_blob/' + m.assetId).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (ds) {
+    if (!ds || !ds.pt) throw new Error('bad data');
+    var meta = Object.assign({}, m, { local: false });
+    if (explicit && App.meta && App.meta.assetId !== m.assetId) {
+      var hist = (App.ui.data.hist || []).filter(function (h) { return h.assetId === m.assetId; })[0];
+      if (hist) Object.assign(meta, hist); meta.historical = true;
+    }
+    useDataset(ds, meta);
+    if (!explicit) cacheSet({ ds: ds, meta: meta });
+    if (explicit) toast('Showing the upload from ' + (meta.uploadedAt ? new Date(meta.uploadedAt).toLocaleDateString() : 'earlier') + '. Reload the app to return to the latest.', 6000);
+  }).catch(function (e) { console.error(e); if (explicit || !App.ds) toast('Could not load the shared data. Try reloading, or upload the workbook again.', 7000); })
+    .then(function () { loadingAsset = null; });
+}
+function loadHistory() {
+  var db = App.caps.db; if (!db) return; App.ui.data.histLoading = true;
+  db.collection('uploads').orderBy('uploadedAt', 'desc').limit(25).get().then(function (snap) {
+    var rows = snap.docs.map(function (d) { var x = Object.assign({}, d.data()); return x; });
+    var ids = rows.map(function (r) { return r.uploadedBy; }).filter(Boolean);
+    var done = function () { App.ui.data.hist = rows; App.ui.data.histLoading = false; if (App.view === 'data') render(); };
+    if (App.caps.user && ids.length) App.caps.user.profiles(ids).then(function (ps) { rows.forEach(function (r) { var p = ps && ps[r.uploadedBy]; r.who = p && p.name ? p.name : ''; }); done(); }).catch(done); else done();
+  }).catch(function () { App.ui.data.hist = []; App.ui.data.histLoading = false; if (App.view === 'data') render(); });
+}
+function saveSettings(s) {
+  var db = App.caps.db; if (!db) return;
+  var p = s ? db.doc('meta/settings').set(s) : db.doc('meta/settings').delete();
+  p.then(function () { App.saved = s; rebuild(); toast(s ? 'Settings saved for everyone.' : 'Back to the workbook values for everyone.'); })
+    .catch(function (e) { toast('Settings were not saved (' + (e && e.code || 'error') + ').'); });
+}
+
+/* ---------------- boot ---------------- */
+function boot() {
+  var saved = lsGet('ui', null); if (saved) Object.keys(App.ui).forEach(function (k) { if (saved[k]) App.ui[k] = saved[k]; });
+  App.ui.wo.sel = null; App.ui.data = {}; Object.keys(App.ui).forEach(function (k) { if (k.indexOf('more_') === 0) delete App.ui[k]; });
+  App.sort = lsGet('sort', {}) || {};
+  var hv = location.hash.slice(1); App.view = VIEW_FN[hv] ? hv : (lsGet('view', 'efficiency') || 'efficiency');
+  if (!VIEW_FN[App.view]) App.view = 'efficiency';
+  render();
+  var local = lsGet('settings', null);
+  cacheGet().then(function (c) { if (c && c.ds && !App.ds) { if (!App.caps.db) App.saved = local; useDataset(c.ds, c.meta || {}); } else if (!App.ds) render(); });
+  var C = window.claude;
+  if (!C || !C.use) {
+    App.saved = local;
+    // Hosted outside Claude (e.g. GitHub Pages): plain browser downloads for CSV export
+    App.caps.downloads = { save: function (o) { var u = URL.createObjectURL(o.data), a = document.createElement('a'); a.href = u; a.download = o.filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 2000); return Promise.resolve(); } };
+    render(); return;
+  }
+  Promise.all([C.use('db'), C.use('user'), C.use('assets'), C.use('downloads')]).then(function (r) {
+    App.caps.db = r[0]; App.caps.user = r[1]; App.caps.assets = r[2]; App.caps.downloads = r[3];
+    var u = App.caps.user;
+    if (u) { try { App.canEdit = !!u.canEdit(); } catch (e) {} try { u.id().then(function (id) { App.uid = id; }).catch(function () {}); } catch (e) {} }
+    if (!App.caps.db) { App.saved = local; if (App.ds) rebuild(); else render(); return; }
+    App.caps.db.doc('meta/settings').onSnapshot(function (s) { App.saved = s.exists ? s.data() : null; if (App.ds) rebuild(); }, function () {});
+    App.caps.db.doc('meta/current').onSnapshot(function (s) {
+      if (!s.exists) { if (!App.ds) render(); return; }
+      var m = s.data();
+      if (App.meta && App.meta.assetId === m.assetId) { if (!App.meta.uploaderName) { App.meta = Object.assign({}, App.meta, m, { local: false }); resolveUploader(); renderInfo(); } return; }
+      if (pendingAsset === m.assetId) return;
+      if (App.meta && App.meta.historical) return;
+      var had = !!App.ds;
+      loadFromAsset(m).then(function () { if (had && App.meta && App.meta.assetId === m.assetId) toast('New data was uploaded and is now showing.'); });
+    }, function () {});
+    render();
+  }).catch(function () { render(); });
+}
+boot();
+})();
+</script>
+</body></html>
