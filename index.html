@@ -152,7 +152,27 @@ details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:60
 .lk-big .b .v{color:var(--good)} .lk-big .nb .v{color:var(--copper)}
 .splitbar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--surface-2);margin:4px 0 12px}
 .splitbar i{display:block;height:100%}
-@media (max-width:640px){.finder{flex-basis:100%;order:4}.brand h1{font-size:19px}.kpi .v{font-size:24px}.kpi.hero .v{font-size:32px}h2{font-size:22px}.datainfo{flex-basis:100%;order:3}}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin:6px 10px 6px 0;flex:none;align-self:center}
+.seg button{border:0;background:var(--surface);color:var(--muted);font-family:var(--f-display);font-weight:600;font-size:14px;padding:5px 12px;white-space:nowrap}
+.seg button.on{background:var(--accent);color:var(--on-accent)}
+.hbars{display:flex;flex-direction:column;gap:7px}
+.hb{display:grid;grid-template-columns:minmax(110px,190px) 1fr auto;gap:10px;align-items:center;font-size:13px}
+.hb-l{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-t{height:12px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.hb-t i{display:block;height:100%;border-radius:3px}
+.hb-v{font-family:var(--f-mono);font-size:12.5px;text-align:right;white-space:nowrap}
+.grid5{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.kpi-l{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:6px}
+.kpi-l b{color:var(--ink);font-family:var(--f-display);font-size:16px;margin-left:4px}
+.names{font-size:13px;line-height:1.7}
+.steps{display:flex;flex-wrap:wrap;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.step{flex-basis:100%;position:relative;padding:4px 0 6px 16px;display:flex;gap:10px;align-items:baseline;font-size:13px}
+.step::before{content:"";position:absolute;left:-6px;top:9px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.step.future::before{background:var(--surface);border:2px solid var(--accent);width:6px;height:6px}
+.step b{font-family:var(--f-mono);font-weight:500;font-size:12.5px;min-width:96px}
+.step span{color:var(--muted)}
+@media (max-width:640px){.hb{grid-template-columns:minmax(90px,120px) 1fr auto}.finder{flex-basis:100%;order:4}.brand h1{font-size:19px}.kpi .v{font-size:24px}.kpi.hero .v{font-size:32px}h2{font-size:22px}.datainfo{flex-basis:100%;order:3}}
 </style>
 <header class="top">
   <div class="wrap">
@@ -164,9 +184,9 @@ details summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:60
         <input type="search" id="woFind" placeholder="Look up WO #  ( / )" autocomplete="off" spellcheck="false" aria-controls="woSug" aria-autocomplete="list">
         <div class="sug" id="woSug" role="listbox" hidden></div>
       </div>
-      <input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls" hidden>
-      <button class="btn" id="refreshBtn" type="button" title="Re-read the workbook after you refresh and save it in Excel">↻ Refresh</button>
-      <button class="btn primary" id="uploadBtn" type="button">Upload workbook</button>
+      <input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls" multiple hidden>
+      <button class="btn" id="refreshBtn" type="button" title="Re-read the workbooks after you refresh and save them in Excel">↻ Refresh</button>
+      <button class="btn primary" id="uploadBtn" type="button">Upload workbooks</button>
     </div>
     <nav class="tabs" id="tabs" aria-label="Views"></nav>
   </div>
@@ -190,9 +210,23 @@ var Core = (function () {
     thresh: { near: 0.85, over: 1 },
     rollup: 'original',
     effTarget: 0.75,
-    prodStart: 20535 // 2026-03-23
+    prodStart: 20535, // 2026-03-23
+    deadline: 20666, // 2026-08-01 HEX Q2 2026 deadline
+    agingDays: 30,
+    nw: { fieldWeeks: 2, hpd: 8, riskDays: 5 }
   };
   var DESIGN_RATE_KEYS = ['PF', 'GDT', 'Corrections', 'Max/Del'];
+  // Same cleanup the workbooks' Power Queries apply to the Production Tracker list
+  var EXCLUDE_NAMES = ['Abraham Nambos', 'Alejandro Montejano', 'Art Bautista', 'Baltazar Garcia', 'Breana Wright', 'Carlos Marquez', 'Cesar Avila', 'Christina Hill', 'Daisy Hernandez', "De'Anthony Davis", 'Drew Gayle', 'Edwin Garcia Reyes', 'Emma Benitez', 'Glenn Caldwell', 'Holly Brown', 'Javier Avila (Santiago)', 'Javier Avila-Santiago', 'Jay Sippel', 'Jayci Gibson', 'Jessica Johnson', 'Justin Kruger', 'Matthew Martinez', 'Neomi Bazan', 'Nickbert Emepue', 'Rachel Emerine', 'Rigel Ganac', 'Steven White', 'Uriel Morales', 'Yazan Saydawi', 'Zamira Andrade', 'Jaucelyn Gibson'];
+  // One spelling per person across every sheet
+  var ALIASES = { 'marlene lozano gallegos': 'Marlene Lozano', 'joe avalos': 'Joey Avalos', 'christopher umanzor': 'Chris Umanzor', 'nicholas millunzi': 'Nick Millunzi', 'nickalus ngo': 'Nick Ngo',
+    'danton joseph kusaj': 'Danton Kusaj', 'vaishnavi chandra tella': 'Vaishnavi Chandra', 'vaishnavi tella': 'Vaishnavi Chandra', 'jacob stanley': 'Corben Stanley', 'martin esquivel barboza': 'Martin Esquivel' };
+  function person(v) { var n = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); return ALIASES[n.toLowerCase()] || n; }
+  var STATUS_MAP = { 'Ready to Field (Designer)': 'New', 'Ready to Field': 'New', 'Ready For Strand Mapping': 'New', 'Field Complete': 'New', 'Not Started': 'New', 'In Design': 'Design',
+    'QAQC Needed': 'Contractor Tech Review', 'QAQC In Progress': 'Contractor Tech Review', 'QAQC Complete': 'Contractor Tech Review', 'Corrections Needed': 'Design', 'Corrections in Progress': 'Design',
+    'PC Review': 'Contractor Tech Review', 'Waiting on Veg Estimate': 'Waiting on Entergy Response', 'Waiting on Entergy Response': 'Waiting on Entergy Response', 'Hold Pending Permit': 'Hold Pending Permit',
+    'Pending Tech Review': 'Waiting on Entergy Approval', 'Tech Review Revisions': 'Design', 'Approved': 'Approved', 'Approved - Holding for Permit': 'Approved - Waiting on VEG',
+    'Approved - Pending Payment': 'Approved - Pending Payment', 'Sent to Network/Construction': 'Complete - Sent to Const/Ntwk', 'Canceled': 'Cancelled', 'Hold-Add a Note': 'Design', 'Go Backs Needed': 'Design' };
 
   /* ---------- small helpers ---------- */
   function key(s) { return String(s == null ? '' : s).trim().toLowerCase(); }
@@ -247,28 +281,34 @@ var Core = (function () {
   function parseWorkbook(XLSX, data, fileName) {
     var wb = XLSX.read(data, { type: 'array', cellDates: false, cellFormula: false, cellHTML: false, cellStyles: false });
     var cache = {}, warn = [];
-    var ds = { v: 1, file: fileName || '', parsedAt: new Date().toISOString(), dict: { p: [], w: [], t: [], c: [], s: [] } };
+    var ds = { v: 2, file: fileName || '', parsedAt: new Date().toISOString(), dict: { p: [], w: [], t: [], c: [], s: [] }, woh: [], proj: [], fam: [], sc: [], emp: [] };
     var dIdx = { p: {}, w: {}, t: {}, c: {}, s: {} };
     function intern(k, v) { if (!(v in dIdx[k])) { dIdx[k][v] = ds.dict[k].length; ds.dict[k].push(v); } return dIdx[k][v]; }
 
     // Production Tracker
+    ds.has = {};
     var pt = findTable(XLSX, wb, ['date', 'name', 'workorder', 'hours', 'wotask', 'billable'], 'Production Tracker', cache);
-    if (!pt) throw new Error('Could not find the Production Tracker sheet (needs Date, Name, WorkOrder, Hours, WOTask and Billable? columns).');
-    var c = pt.col, recs = [];
+    if (!pt) pt = { rows: [], col: {}, missing: true };
+    var c = pt.col, recs = [], dropped = 0, otherClient = 0, EXCL = {};
+    EXCLUDE_NAMES.forEach(function (n) { EXCL[n.toLowerCase()] = 1; });
     pt.rows.forEach(function (r) {
       if (!r) return;
-      var d = toDay(r[c.date]); var nm = str(r[c.name]);
-      if (d == null || !nm) return;
-      var b = key(r[c.billable]);
+      var d = toDay(r[c.date]); var raw = str(r[c.name]);
+      if (d == null || !raw) return;
+      var gone = EXCL[raw.toLowerCase()] ? 1 : 0; if (gone) dropped++;
+      var nm = person(raw), cl = str(r[c.client]); if (key(cl) === 'techserv') cl = 'TechServ';
+      if (['entergy', 'techserv', 'ts new hire'].indexOf(key(cl)) < 0) { otherClient++; gone = 2; }
+      var b = key(r[c.billable]); if (!b) b = key(cl) === 'entergy' ? 'billable' : 'not billable';
       recs.push([d, intern('p', nm), intern('w', normWO(r[c.workorder])), num(r[c.production]) || 0, num(r[c.hours]) || 0,
-        intern('s', str(r[c.status])), intern('t', str(r[c.wotask])), intern('c', str(r[c.client])),
-        b === 'billable' ? 1 : b === 'not billable' ? 0 : -1, str(r[c.notes])]);
+        intern('s', str(r[c.status])), intern('t', str(r[c.wotask]).replace(/[\x00-\x1f]/g, '')), intern('c', cl),
+        b === 'billable' ? 1 : b === 'not billable' ? 0 : -1, str(r[c.notes]), gone]);
     });
     recs.sort(function (a, b) { return a[0] - b[0]; });
-    var P = ds.pt = { d: [], n: [], w: [], p: [], h: [], s: [], t: [], c: [], b: [], notes: {} };
+    if (!pt.missing) { ds.has.pt = 1; ds.ptClean = { dropped: dropped, otherClient: otherClient }; }
+    var P = ds.pt = { d: [], n: [], w: [], p: [], h: [], s: [], t: [], c: [], b: [], x: [], notes: {} };
     recs.forEach(function (x, i) {
       P.d.push(x[0]); P.n.push(x[1]); P.w.push(x[2]); P.p.push(x[3]); P.h.push(x[4]); P.s.push(x[5]); P.t.push(x[6]); P.c.push(x[7]); P.b.push(x[8]);
-      if (x[9]) P.notes[i] = x[9];
+      P.x.push(x[10]); if (x[9]) P.notes[i] = x[9];
     });
 
     // WO Hours (work order register)
@@ -279,49 +319,107 @@ var Core = (function () {
       wh.rows.forEach(function (r) {
         if (!r) return; var wo = normWO(r[c.workorder]); if (!wo) return;
         ds.woh.push({ prog: str(r[c.program]), grp: str(r[c.projectgroup]), wo: wo, desc: str(r[c.wodescription]), wp: num(r[c.workpointcount]),
-          des: str(r[c.designer]).replace(/[\x00-\x1f]/g, ''), st: str(r[c.status]), cost: num(r[c.totalcostestimate]), mh: num(r[c.manhours]),
+          des: person(str(r[c.designer]).replace(/[\x00-\x1f]/g, '')), st: str(r[c.status]), cost: num(r[c.totalcostestimate]), mh: num(r[c.manhours]),
           orig: normWO(r[c.originalwo]), tsd: toDay(r[c.targetstartdate]) });
       });
-    } else warn.push('No WO Hours sheet found; work order budgets will use Project Tracker only.');
+      ds.has.woh = 1;
+    }
 
     // Project Tracker
     var pr = findTable(XLSX, wb, ['designer', 'workorder', 'wodescription', 'workpointcount', 'senttoqaqc'], 'Project Tracker', cache);
     ds.proj = [];
     if (pr) {
-      c = pr.col;
+      c = pr.col; ds.has.proj = 1; ds.projFull = 'datereceivedwork' in c && 'projectgroup' in c;
+      var D = function (r, k) { return k in c ? toDay(r[c[k]]) : null; }, S = function (r, k) { return k in c ? str(r[c[k]]) : ''; };
       pr.rows.forEach(function (r) {
         if (!r) return; var wo = normWO(r[c.workorder]); if (!wo) return;
-        ds.proj.push({ wo: wo, des: str(r[c.designer]), desc: str(r[c.wodescription]), wp: num(r[c.workpointcount]), sent: toDay(r[c.senttoqaqc]) , qa: str(r[c.qaqc]), st: str(r[c.status]), tsd: toDay(r[c.targetstartdate]) });
+        ds.proj.push({ id: S(r, 'id'), wo: wo, des: person(S(r, 'designer')), desc: S(r, 'wodescription'), wp: num(r[c.workpointcount]), sent: D(r, 'senttoqaqc'), qa: person(S(r, 'qaqc')), st: S(r, 'status'), tsd: D(r, 'targetstartdate'),
+          recv: D(r, 'datereceivedwork'), due: D(r, 'designduedate'), ifr: D(r, 'ifrtechreviewdate'), appr: D(r, 'datewowasapprovedbyentergy'), net: D(r, 'datesenttonetworkconstruc'),
+          rev: D(r, 'datesenttoentergyforreview'), back: D(r, 'datereceivedbackfromentergy'), bp: D(r, 'forecastedbluepacketdate'), otf: D(r, 'originaltargetfinishdate'), ntf: D(r, 'newtargetfinishdate'),
+          prog: S(r, 'program'), grp: S(r, 'projectgroup'), cost: 'totalcostestimate' in c ? num(r[c.totalcostestimate]) : null, mh: 'manhours' in c ? num(r[c.manhours]) : null, orig: 'originalwo' in c ? normWO(r[c.originalwo]) : '',
+          poles: 'polecount' in c ? num(r[c.polecount]) : null, network: S(r, 'network'), city: S(r, 'city'), maximo: S(r, 'maximostatus'), type: S(r, 'workordertype'), scope: S(r, 'scope') });
       });
     }
+
+    // Permit Tracker (PC Tracker workbook)
+    var pm = findTable(XLSX, wb, ['permittype', 'workorder', 'daterequested', 'dateacquired'], 'Permit Tracker', cache);
+    if (pm) {
+      c = pm.col; ds.has.permits = 1; ds.permits = [];
+      pm.rows.forEach(function (r) {
+        if (!r) return; var t = str(r[c.permittype]), wo = normWO(r[c.workorder]); if (!t && !wo) return;
+        ds.permits.push({ pid: str(r[c.projecttrackerid]), type: t, wo: wo, orig: normWO(r[c.originalwo]), req: toDay(r[c.daterequested]), map: toDay(r[c.datesenttomappinginternal]), acq: toDay(r[c.dateacquired]), done: toDay(r[c.datecompleted]) });
+      });
+    }
+    // TS status -> Entergy status (Validations)
+    var vm = findTable(XLSX, wb, ['tsstatus', 'entergystatus'], 'Validations', cache);
+    if (vm) { c = vm.col; ds.statusMap = {}; vm.rows.forEach(function (r) { if (r && str(r[c.tsstatus])) ds.statusMap[str(r[c.tsstatus])] = str(r[c.entergystatus]); }); ds.has.statusMap = 1; }
+    // New Work Incoming (typed in by hand)
+    var nw = findTable(XLSX, wb, ['subworktype', 'wo', 'jobdescription', 'duedate'], 'New Work Incoming', cache);
+    if (nw) {
+      c = nw.col; ds.has.newwork = 1; ds.newwork = [];
+      nw.rows.forEach(function (r) {
+        if (!r) return; var wo = normWO(r[c.wo]), jd = str(r[c.jobdescription]); if (!wo && !jd) return;
+        ds.newwork.push({ type: str(r[c.subworktype]).replace(/\u00a0/g, ' ').trim(), wo: wo, ppwo: str(r[c.ppwo]), desc: jd, recv: toDay(r[c.datereceived]), insp: toDay(r[c.inspectiondue]), due: toDay(r[c.duedate]),
+          release: toDay(r[c.forecastreleasetoconstruction]), device: str(r[c.devicetype]), feeder: str(r[c.feederid]), mx: str(r[c.mxnumber]), deviceId: str(r[c.deviceid]), wp: num(r[c.estimatedworkpoint]),
+          re: str(r[c.re]), reNotes: str(r[c.renotes]), field: num(r[c.fieldingtime]), backlog: num(r[c.qaqcbacklog]) });
+      });
+      // schedule settings typed beside the table
+      var nwRows = cache[nw.sheet], ns = {};
+      nwRows.forEach(function (r) { (r || []).forEach(function (v, i) { var t = String(v || '').toLowerCase(); var val = num((r || [])[i + 1]);
+        if (val == null) return; if (/default fielding time/.test(t)) ns.fieldWeeks = val; else if (/productive hours per workday/.test(t)) ns.hpd = val; else if (/at risk/.test(t)) ns.riskDays = val; }); });
+      ds.newworkCfg = ns;
+    }
+    // HEX project list (names typed in by hand)
+    var hx = findTable(XLSX, wb, ['projectnamebydeviceid', 'firstsectionwo'], 'HEX WO Name Groups', cache);
+    if (hx) {
+      c = hx.col; ds.has.hex = 1; ds.hex = [];
+      for (var hi = 0; hi < hx.rows.length; hi++) {
+        var r = hx.rows[hi] || [];
+        if (r.some(function (v) { return /^base description/i.test(String(v || '')); })) break; // helper block under the table
+        var n = str(r[c.projectnamebydeviceid]); if (!n) continue;
+        ds.hex.push({ name: n, des: person(str(r[c.designer])), first: normWO(r[c.firstsectionwo]), req: str(r[c.hasitbeenrequested]) });
+      }
+    }
+    // Week comments typed into the timeline sheets
+    ['AllProj Timeline', 'Hex Q2 Timeline'].forEach(function (nm, ix) {
+      var sn = wb.SheetNames.filter(function (n) { return hkey(n) === hkey(nm); })[0]; if (!sn) return;
+      var rows = cache[sn] || sheetRows(XLSX, wb.Sheets[sn]), hdr = (rows[0] || []).map(hkey), wi = hdr.indexOf('weekstart'), ci = hdr.indexOf('comments');
+      if (wi < 0 || ci < 0) return; ds.notes = ds.notes || {}; var key2 = ix ? 'hex' : 'all'; ds.notes[key2] = {};
+      rows.slice(1).forEach(function (r) { if (r && r[ci] && toDay(r[wi]) != null) ds.notes[key2][toDay(r[wi])] = str(r[ci]); });
+      ds.has.notes = 1;
+    });
 
     // WO Number Tracker (re-numbered work orders)
     var fm = findTable(XLSX, wb, ['newwo', 'oldwo'], 'WO Number Tracker', cache);
     ds.fam = [];
-    if (fm) { c = fm.col; fm.rows.forEach(function (r) { if (!r) return; var n = normWO(r[c.newwo]), o = normWO(r[c.oldwo]); if (n && o && n !== o) ds.fam.push([n, o, str(r[c.reasonforchange])]); }); }
+    if (fm) { c = fm.col; ds.has.fam = 1; fm.rows.forEach(function (r) { if (!r) return; var n = normWO(r[c.newwo]), o = normWO(r[c.oldwo]); if (n && o && n !== o) ds.fam.push([n, o, str(r[c.reasonforchange])]); }); }
 
     // QC Scorecard
     var sc = findTable(XLSX, wb, ['designer', 'qctechnician', 'overallscore', 'workorder'], 'Scorecard', cache);
     ds.sc = [];
     if (sc) {
-      c = sc.col;
+      c = sc.col; ds.has.sc = 1;
       sc.rows.forEach(function (r) {
-        if (!r) return; var d = str(r[c.designer]); if (!d) return;
-        ds.sc.push({ des: d, d: toDay(r[c.date]), tech: str(r[c.qctechnician]), wo: normWO(r[c.workorder]), ver: num(r[c.version]),
+        if (!r) return; var d = person(r[c.designer]); if (!d) return;
+        ds.sc.push({ des: d, d: toDay(r[c.date]), tech: person(r[c.qctechnician]), wo: normWO(r[c.workorder]), ver: num(r[c.version]),
           pf: num(r[c.poleforemanscore]), gdt: num(r[c.gdtscore]), del: num(r[c.deliverablescore]), ov: num(r[c.overallscore]), pts: num(r[c.affectedpoints]) });
       });
-    } else warn.push('No Scorecard sheet found; QC views will be empty.');
+    }
 
     // Employee List (only the fields the app needs; birthdays and schooling are left out)
     var em = findTable(XLSX, wb, ['employeename', 'location', 'startdate'], 'Employee List', cache);
     ds.emp = [];
     if (em) {
-      c = em.col;
+      c = em.col; ds.has.emp = 1;
       em.rows.forEach(function (r) {
-        if (!r) return; var n = str(r[c.employeename]); if (!n) return;
-        ds.emp.push({ name: n, rep: str(r[c.reportsto]), proj: str(r[c.project]), start: toDay(r[c.startdate]), task: str(r[c.task]), loc: str(r[c.location]) });
+        if (!r) return; var n = person(r[c.employeename]); if (!n) return;
+        var pj = str(r[c.project]), tk = str(r[c.task]);
+        // Same filter as the Employee List query: Entergy Engineering / Joint Use, no PMs
+        if (pj && !/^entergy (engineering|joint use)$/i.test(pj)) return; if (key(tk) === 'pm') return;
+        if (ds.emp.some(function (e) { return key(e.name) === key(n); })) return;
+        ds.emp.push({ name: n, rep: person(r[c.reportsto]), proj: pj, start: toDay(r[c.startdate]), task: tk, loc: str(r[c.location]) });
       });
-    } else warn.push('No Employee List sheet found; locations and start dates will be blank.');
+    }
 
     // Estimator rates, ramp and budget thresholds (fall back to defaults)
     ds.cfg = {};
@@ -335,7 +433,7 @@ var Core = (function () {
           if (k) rates[k] = [num(row[2]), num(row[3])];
         }
       }
-      if (Object.keys(rates).length >= 4) ds.cfg.rates = rates;
+      if (Object.keys(rates).length >= 4) { ds.cfg.rates = rates; ds.has.cfg = 1; }
       // Ramp table: header "Ramp Start Day" then 5 rows of [start, multiplier]
       for (i = 0; i < er.length; i++) {
         var rw = er[i] || [], ci = rw.findIndex(function (v) { return hkey(v) === 'rampstartday'; });
@@ -354,14 +452,40 @@ var Core = (function () {
       if (th.near != null && th.over != null) ds.cfg.thresh = th;
     }
     ds.warn = warn;
-    ds.counts = { entries: P.d.length, wos: ds.woh.length, scorecards: ds.sc.length, employees: ds.emp.length, minDay: P.d[0], maxDay: P.d[P.d.length - 1] };
+    if (!Object.keys(ds.has).length) throw new Error('This file does not look like the PC Production Tracker or PC Tracker workbook: none of the expected sheets were found.');
+    ds.files = [fileName || ''];
+    ds.src = {}; Object.keys(ds.has).forEach(function (k) { ds.src[k] = { file: fileName || '', at: ds.parsedAt }; });
+    recount(ds);
     return ds;
+  }
+
+  function recount(ds) {
+    var P = ds.pt;
+    ds.counts = { entries: P.d.length, wos: (ds.projFull ? ds.proj.length : ds.woh.length), scorecards: ds.sc.length, employees: ds.emp.length, permits: (ds.permits || []).length, newwork: (ds.newwork || []).length, minDay: P.d[0], maxDay: P.d[P.d.length - 1] };
+  }
+  // Combine a fresh upload with what was loaded before: every table found in the new file replaces the old one.
+  var TABLE_KEYS = { pt: ['pt', 'dict', 'ptClean'], woh: ['woh'], proj: ['proj', 'projFull'], fam: ['fam'], sc: ['sc'], emp: ['emp'], permits: ['permits'], statusMap: ['statusMap'], newwork: ['newwork', 'newworkCfg'], hex: ['hex'], notes: ['notes'], cfg: ['cfg'] };
+  function mergeDatasets(base, add) {
+    if (!base) return add;
+    var out = JSON.parse(JSON.stringify(base)), msgs = [];
+    out.has = out.has || {}; out.src = out.src || {};
+    Object.keys(add.has).forEach(function (k) {
+      if (k === 'pt' && base.has && base.has.pt && add.counts.maxDay < base.counts.maxDay) { msgs.push('Kept the newer time entries already loaded (through ' + dayToISO(base.counts.maxDay) + ').'); return; }
+      if (k === 'proj' && base.projFull && !add.projFull) { msgs.push('Kept the fuller Project Tracker from ' + (base.src.proj || {}).file + '.'); return; }
+      (TABLE_KEYS[k] || [k]).forEach(function (f) { out[f] = add[f]; });
+      out.has[k] = 1; out.src[k] = add.src[k];
+    });
+    out.files = Object.keys(out.src).map(function (k) { return out.src[k].file; }).filter(function (f, i, a) { return f && a.indexOf(f) === i; });
+    out.file = out.files.join(' + '); out.parsedAt = add.parsedAt; out.warn = msgs;
+    recount(out);
+    return out;
   }
 
   /* ---------- model ---------- */
   function settingsFrom(ds, saved) {
     var s = JSON.parse(JSON.stringify(DEFAULTS));
     if (ds && ds.cfg) { if (ds.cfg.rates) s.rates = ds.cfg.rates; if (ds.cfg.ramp) s.ramp = ds.cfg.ramp; if (ds.cfg.thresh) s.thresh = ds.cfg.thresh; }
+    if (ds && ds.newworkCfg) Object.keys(ds.newworkCfg).forEach(function (k) { s.nw[k] = ds.newworkCfg[k]; });
     if (saved) Object.keys(saved).forEach(function (k) { if (saved[k] != null && k in DEFAULTS) s[k] = saved[k]; });
     return s;
   }
@@ -384,10 +508,13 @@ var Core = (function () {
 
     // indexes
     var byW = {}, byP = {};
-    for (i = 0; i < N; i++) { (byW[P.w[i]] || (byW[P.w[i]] = [])).push(i); (byP[P.n[i]] || (byP[P.n[i]] = [])).push(i); }
+    // x = 1: person removed by the query (former staff); x = 2: other client. Both stay on WO totals only.
+    var X = P.x || []; M.gone = function (i) { return !!X[i]; };
+    for (i = 0; i < N; i++) { (byW[P.w[i]] || (byW[P.w[i]] = [])).push(i); if (!X[i]) (byP[P.n[i]] || (byP[P.n[i]] = [])).push(i); }
     M.byW = byW; M.byP = byP;
     M.woIdx = {}; D.w.forEach(function (w, ix) { if (w) M.woIdx[w] = ix; });
     M.pIdx = {}; D.p.forEach(function (p, ix) { M.pIdx[key(p)] = ix; });
+    M.people = D.p.filter(function (p, ix) { return p && byP[ix]; }).sort();
     M.minDay = N ? P.d[0] : null; M.maxDay = N ? P.d[N - 1] : null;
 
     // employees
@@ -410,14 +537,17 @@ var Core = (function () {
     var r1 = 0, r2 = 0; DESIGN_RATE_KEYS.forEach(function (k) { var r = S.rates[k] || [0, 0]; r1 += r[0]; r2 += r[1]; });
     M.designFirst = r1; M.designAdd = r2;
 
-    // work orders
+    // work orders: the full Project Tracker carries every WO Hours column, so it wins when present
+    M.today = (saved && saved._today) || Math.floor(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()) / 864e5);
+    M.statusMap = ds.statusMap && Object.keys(ds.statusMap).length ? ds.statusMap : STATUS_MAP;
+    var reg = ds.projFull ? ds.proj : (ds.woh || []);
     M.wos = []; M.woMap = {};
-    ds.woh.forEach(function (r) { if (M.woMap[r.wo]) return; var o = woCompute(M, r); M.wos.push(o); M.woMap[r.wo] = o; });
+    reg.forEach(function (r) { if (M.woMap[r.wo]) return; var o = woCompute(M, r); M.wos.push(o); M.woMap[r.wo] = o; });
     // WOs that have time logged but are not in the WO Hours register
     Object.keys(byW).forEach(function (wi) {
       var wo = D.w[wi]; if (!wo || wo === OH || wo === TR || M.woMap[wo]) return;
       var pj = M.proj[wo];
-      var o = woCompute(M, { prog: '', grp: '', wo: wo, desc: pj ? pj.desc : '', wp: pj ? pj.wp : null, des: pj ? pj.des : '', st: pj ? pj.st : '', orig: '', cost: null, mh: null, tsd: pj ? pj.tsd : null, _unlisted: true });
+      var o = woCompute(M, { prog: pj ? pj.prog || '' : '', grp: pj ? pj.grp || '' : '', wo: wo, desc: pj ? pj.desc : '', wp: pj ? pj.wp : null, des: pj ? pj.des : '', st: pj ? pj.st : '', orig: '', cost: null, mh: null, tsd: pj ? pj.tsd : null, _unlisted: true });
       M.wos.push(o); M.woMap[wo] = o;
     });
     return M;
@@ -472,7 +602,7 @@ var Core = (function () {
       unlisted: !!r._unlisted, set: set, nRows: rows.length,
       est: est, estQC: estRes(M, 'QC', r.wp), desH: desH, remain: est - desH, util: util, budget: status, actual: act,
       over: Math.max(0, desH - est), eff: (b + n) === 0 ? null : b / (b + n), billH: b, nonBillH: n, totalH: tot,
-      first: first, last: last, team: emp ? emp.loc : '', sent: pj ? pj.sent : null, qa: pj ? pj.qa : '',
+      first: first, last: last, team: emp ? emp.loc : '', sent: pj ? pj.sent : null, qa: pj ? pj.qa : '', ent: M.statusMap[r.st] || '', pj: pj || null,
       qcCount: (M.scByWO[r.wo] || []).length
     };
   }
@@ -557,7 +687,7 @@ var Core = (function () {
   }
   function rangeRows(M, from, to) {
     var P = M.ds.pt, out = [];
-    for (var i = 0; i < M.N; i++) { var d = P.d[i]; if (d >= from && d < to) out.push(i); }
+    for (var i = 0; i < M.N; i++) { var d = P.d[i]; if (d >= from && d < to && !M.gone(i)) out.push(i); }
     return out;
   }
   function peopleInRange(M, from, to) {
@@ -582,6 +712,7 @@ var Core = (function () {
   function taskObs(M, filter) {
     var P = M.ds.pt, D = M.ds.dict, obs = {};
     for (var i = 0; i < M.N; i++) {
+      if (M.gone(i)) continue;
       var t = D.t[P.t[i]].trim(), w = D.w[P.w[i]], p = D.p[P.n[i]];
       if (!t || !w || !p) continue;
       if (filter && !filter(i, t, w, p)) continue;
@@ -597,7 +728,7 @@ var Core = (function () {
     if (M.maxDay == null) return out;
     for (var ws = M.S.prodStart, n = 1; ws <= M.maxDay; ws += 7, n++) out.push({ n: n, start: ws, pf: 0, gdt: 0 });
     for (var i = 0; i < M.N; i++) {
-      var d = P.d[i]; if (d < M.S.prodStart) continue;
+      var d = P.d[i]; if (d < M.S.prodStart || M.gone(i)) continue;
       var k = Math.floor((d - M.S.prodStart) / 7), t = M.tkey[P.t[i]];
       if (!out[k]) continue;
       if (t === 'pole foreman') out[k].pf += P.p[i]; else if (t === 'gdt') out[k].gdt += P.p[i];
@@ -666,7 +797,7 @@ var Core = (function () {
   return {
     OH: OH, TR: TR, DEFAULTS: DEFAULTS, CATCH_ALL: CATCH_ALL, KEYWORDS: KEYWORDS, DESIGN_TASKS: DESIGN_TASKS,
     key: key, num: num, toDay: toDay, dow: dow, weekStart: weekStart, dayToISO: dayToISO, grade: grade, avg: avg,
-    parseWorkbook: parseWorkbook, buildModel: buildModel, settingsFrom: settingsFrom, woCompute: woCompute, woDetail: woDetail, woHours: woHours, woSearch: woSearch,
+    parseWorkbook: parseWorkbook, mergeDatasets: mergeDatasets, person: person, STATUS_MAP: STATUS_MAP, EXCLUDE_NAMES: EXCLUDE_NAMES, ALIASES: ALIASES, buildModel: buildModel, settingsFrom: settingsFrom, woCompute: woCompute, woDetail: woDetail, woHours: woHours, woSearch: woSearch,
     effAgg: effAgg, personRows: personRows, rangeRows: rangeRows, peopleInRange: peopleInRange, weeksBetween: weeksBetween,
     qcSummary: qcSummary, qcDesigners: qcDesigners, taskObs: taskObs, weeklyProduction: weeklyProduction, designerWeek: designerWeek,
     estimate: estimate, rampMult: rampMult, estDesign: estDesign, estRes: estRes, ancestors: ancestors, descendants: descendants, dataChecks: dataChecks
@@ -674,18 +805,265 @@ var Core = (function () {
 })();
 if (typeof module !== 'undefined') module.exports = Core;
 </script>
+<script id="ctl">
+/* ===== Ctl: Project Controls calculations (PC Tracker workbook). Pure functions over the model. ===== */
+var Ctl = (function () {
+  'use strict';
+  var C = (typeof Core !== 'undefined') ? Core : require('./core.js');
+  var K = C.key;
+  var TS_ORDER = ['Ready For Strand Mapping', 'Ready to Field', 'Ready to Field (Designer)', 'Field Complete', 'Not Started', 'In Design', 'Hold-Add a Note', 'Go Backs Needed', 'Corrections in Progress',
+    'Corrections Needed', 'Hold Pending Permit', 'QAQC Needed', 'QAQC In Progress', 'PC Review', 'Waiting on Veg Estimate', 'Pending Tech Review', 'Tech Review Revisions', 'Waiting on Entergy Response',
+    'Approved', 'Approved - Holding for Permit', 'Sent to Network/Construction', 'Canceled'];
+  var ENT_ORDER = ['New', 'Design', 'Contractor Tech Review', 'Waiting on Entergy Response', 'Hold Pending Permit', 'Waiting on Entergy Approval', 'Approved', 'Approved - Waiting on VEG', 'Complete - Sent to Const/Ntwk'];
+  var FOCUS_ORDER = ['New', 'Design', 'Contractor Tech Review', 'Waiting on Entergy Response', 'Waiting on Entergy Approval', 'Hold Pending Permit', 'Approved', 'Approved - Waiting on VEG'];
+  var DONE = 'Sent to Network/Construction', CANC = 'Canceled';
+  var ENT_DONE = 'Complete - Sent to Const/Ntwk', ENT_CANC = 'Cancelled';
+  var DESIGN_ACTIVE = ['Field Complete', 'Not Started', 'In Design', 'Corrections in Progress', 'Corrections Needed', 'QAQC Needed', 'QAQC In Progress'];
+  var UNASSIGNED_ST = ['In Design', 'Hold-Add a Note', 'Not Started', 'Ready to Field (Designer)', 'Ready to Field'];
+  var GROUPS = [['all', 'All projects'], ['HEX Q2 2026', 'HEX Q2 2026'], ['HEX Q2 2027', 'HEX Q2 2027'], ['', 'Non-HEX (no group)']];
+
+  function has(M) { return !!(M.ds.projFull); }
+  function projects(M) { return M.ds.projFull ? M.ds.proj : []; }
+  function ent(M, p) { return M.statusMap[p.st] || ''; }
+  function inGroup(p, g) { return g === 'all' || g == null ? true : (p.grp || '') === g; }
+  function active(p) { return p.st !== CANC && p.st !== DONE; }
+  function sumWP(list) { var s = 0; list.forEach(function (p) { s += C.num(p.wp) || 0; }); return s; }
+  function between(d, a, b) { return d != null && d >= a && d <= b; }
+  function mondayOf(d) { return C.weekStart(d); }
+  function isWeekday(d) { return C.dow(d) < 5; }
+  function workday(d, n) { var x = d, k = 0; if (n <= 0) return d; while (k < n) { x++; if (isWeekday(x)) k++; } return x; }
+  function networkdays(a, b) { if (b < a) return -networkdays(b, a); var n = 0; for (var x = a; x <= b; x++) if (isWeekday(x)) n++; return n; }
+
+  /* ---- Status dashboard ---- */
+  function statusBoard(M) {
+    var P = projects(M), byTS = {}, byEnt = {};
+    var cols = ['all', '', 'HEX Q2 2026', 'HEX Q2 2027'];
+    P.forEach(function (p) {
+      var t = p.st || '(blank)', e = ent(M, p) || '(unmapped)';
+      var T = byTS[t] || (byTS[t] = { ts: t, ent: M.statusMap[t] || '', n: {}, wp: {} });
+      var E = byEnt[e] || (byEnt[e] = { ent: e, n: {}, wp: {} });
+      cols.forEach(function (g) { if (!inGroup(p, g)) return; T.n[g] = (T.n[g] || 0) + 1; T.wp[g] = (T.wp[g] || 0) + (C.num(p.wp) || 0); E.n[g] = (E.n[g] || 0) + 1; E.wp[g] = (E.wp[g] || 0) + (C.num(p.wp) || 0); });
+    });
+    function ordered(map, order) { var out = order.map(function (k) { return map[k] || { ts: k, ent: k, n: {}, wp: {} }; }); Object.keys(map).forEach(function (k) { if (order.indexOf(k) < 0) out.push(map[k]); }); return out; }
+    var ts = ordered(byTS, TS_ORDER); ts.forEach(function (r) { if (!r.n.all) r.ent = M.statusMap[r.ts] || ''; });
+    var en = ordered(byEnt, ENT_ORDER.concat([ENT_CANC])); en.forEach(function (r) { if (!r.ent) r.ent = r.ts; });
+    function phase(g) {
+      var get = function (names) { return en.filter(function (r) { return names.indexOf(r.ent) >= 0; }).reduce(function (s, r) { return s + (r.wp[g] || 0); }, 0); };
+      return { remaining: get(['New', 'Design', 'Contractor Tech Review']), withEntergy: get(['Waiting on Entergy Response', 'Hold Pending Permit', 'Waiting on Entergy Approval', 'Approved', 'Approved - Waiting on VEG']), complete: get([ENT_DONE]) };
+    }
+    var phases = {}; cols.forEach(function (g) { phases[g] = phase(g); });
+    return { ts: ts, ent: en, phases: phases };
+  }
+  function scope(M, group, deadline) {
+    var g = group || 'HEX Q2 2026', P = projects(M).filter(function (p) { return (p.grp || '') === g; }), t = M.today, dl = deadline;
+    var wp = sumWP(P), poles = P.reduce(function (s, p) { return s + (C.num(p.poles) || 0); }, 0);
+    var tr = sumWP(P.filter(function (p) { return p.ifr != null && p.ifr > 0 && p.ifr <= dl; }));
+    var rel = sumWP(P.filter(function (p) { return p.net != null && p.net > 0 && p.net <= dl; }));
+    function moved(f) { var L = P.filter(function (p) { return p[f] != null && p[f] > dl && p[f] <= t; }); return { wp: sumWP(L), n: L.length }; }
+    return { group: g, wos: P.length, poles: poles, wp: wp, net: wp - poles, deadline: dl, trByDeadline: tr, pctTR: wp ? tr / wp : null, remainAtDeadline: wp - tr, pctRemain: wp ? (wp - tr) / wp : null,
+      releasedByDeadline: rel, sinceQC: moved('sent'), sinceIFR: moved('ifr'), sinceAppr: moved('appr') };
+  }
+
+  /* ---- KPI summary ---- */
+  function kpis(M, o) {
+    o = o || {}; var t = M.today, wk = Math.max(1, +o.weeks || 1), mon = mondayOf(t);
+    var ps = o.start != null ? o.start : mon - 7 * wk, pe = o.end != null ? o.end : mon - 1, days = pe - ps + 1;
+    var ws = mon, we = Math.min(mon + 6, t), P = projects(M);
+    function cnt(f, a, b, extra) { var L = P.filter(function (p) { return between(p[f], a, b) && (!extra || extra(p)); }); return { n: L.length, wp: sumWP(L) }; }
+    var isNet = function (p) { return p.st === DONE; };
+    var r = {
+      period: { start: ps, end: pe, days: days }, week: { start: ws, end: we },
+      recvP: cnt('recv', ps, pe), recvW: cnt('recv', ws, we), qcP: cnt('sent', ps, pe), qcW: cnt('sent', ws, we),
+      trP: cnt('ifr', ps, pe), trW: cnt('ifr', ws, we), netP: cnt('net', ps, pe, isNet), netW: cnt('net', ws, we, isNet)
+    };
+    var act = P.filter(active); r.active = { n: act.length, wp: sumWP(act) };
+    var hexA = act.filter(function (p) { return p.grp === 'HEX Q2 2026'; }); r.hexActive = { n: hexA.length, wp: sumWP(hexA) };
+    var des = {}; act.forEach(function (p) { if (p.des) des[K(p.des)] = 1; }); r.designers = Object.keys(des).length;
+    r.perDesignerWO = r.designers ? r.active.n / r.designers : null; r.perDesignerWP = r.designers ? r.active.wp / r.designers : null;
+    var fg = o.forecastGroup == null ? 'HEX Q2 2027' : o.forecastGroup;
+    r.notInQC = sumWP(P.filter(function (p) { return inGroup(p, fg) && ['New', 'Design'].indexOf(ent(M, p)) >= 0; })); r.forecastGroup = fg;
+    r.woQCperWk = days ? r.qcP.n / (days / 7) : 0; r.wpQCperWk = days ? r.qcP.wp / (days / 7) : 0; r.wpTRperWk = days ? r.trP.wp / (days / 7) : 0;
+    r.weeksToQC = r.wpQCperWk ? r.notInQC / r.wpQCperWk : null; r.weeksToTR = r.wpTRperWk ? r.notInQC / r.wpTRperWk : null;
+    r.dateQC = r.weeksToQC != null ? t + Math.round(r.weeksToQC * 7) : null; r.dateTR = r.weeksToTR != null ? t + Math.round(r.weeksToTR * 7) : null;
+    r.blocked = P.filter(function (p) { return p.st === 'Hold Pending Permit' || p.st === 'Approved - Holding for Permit'; }).length;
+    var inprog = {}; permitRows(M).forEach(function (x) { if (x.type && x.status === 'In Progress' && x.wo) inprog[x.wo] = 1; }); r.permitsInProgress = Object.keys(inprog).length;
+    return r;
+  }
+
+  /* ---- Timeline ---- */
+  var MILESTONES = [['recv', 'Received'], ['rev', 'Inspection sent to RE'], ['back', 'Received back from RE'], ['sent', 'Sent to internal QC'], ['ifr', 'IFR / Tech Review'], ['appr', 'Approved'], ['net', 'Sent to Network/Construction']];
+  function timeline(M, group, start) {
+    var P = projects(M).filter(function (p) { return inGroup(p, group); }), s0 = start || M.S.prodStart, end = mondayOf(M.today), weeks = [];
+    for (var w = s0, n = 1; w <= end; w += 7, n++) { var row = { n: n, start: w }; MILESTONES.forEach(function (m) { row[m[0]] = { n: 0, wp: 0 }; }); weeks.push(row); }
+    P.forEach(function (p) { MILESTONES.forEach(function (m) { var d = p[m[0]]; if (d == null || d < s0) return; var k = Math.floor((d - s0) / 7); if (weeks[k]) { weeks[k][m[0]].n++; weeks[k][m[0]].wp += C.num(p.wp) || 0; } }); });
+    return { weeks: weeks, milestones: MILESTONES };
+  }
+
+  /* ---- Permits ---- */
+  function permitStatus(x) {
+    if (x.done != null) return 'Complete';
+    if (x.req != null && x.map != null && x.acq != null) return 'Waiting for Permit to be Approved';
+    if (x.acq != null) return 'In Progress';
+    if (x.req != null) return 'Waiting for Permit to be Approved';
+    if (x.map != null) return 'Waiting for Mapping';
+    return 'Not Started';
+  }
+  function permitRows(M) {
+    var byWO = {}; (M.ds.proj || []).forEach(function (p) { if (!byWO[p.wo]) byWO[p.wo] = p; });
+    return (M.ds.permits || []).map(function (x, i) {
+      var p = byWO[x.wo] || {};
+      return { i: i, type: x.type, wo: x.wo, orig: x.orig, req: x.req, map: x.map, acq: x.acq, done: x.done, status: permitStatus(x), woStatus: p.st || '', des: p.des || '', grp: p.grp || '', wp: C.num(p.wp) };
+    });
+  }
+  function permits(M, f) {
+    f = f || {}; var t = M.today, rows = permitRows(M);
+    var live = function (x) { return x.woStatus !== CANC && x.woStatus !== DONE; };
+    var open = rows.filter(function (x) { return x.type && x.status !== 'Complete' && x.wo && live(x); });
+    function uniq(L) { var seen = {}, wp = 0; L.forEach(function (x) { if (!seen[x.wo]) { seen[x.wo] = 1; wp += x.wp || 0; } }); return { n: Object.keys(seen).length, wp: wp }; }
+    var types = []; rows.forEach(function (x) { if (x.type && types.indexOf(x.type) < 0) types.push(x.type); });
+    var pref = ['TXDOT', 'RailRoad', 'NJUNS', '811', 'Vegetation', 'FP Number']; types.sort(function (a, b) { var i = pref.indexOf(a), j = pref.indexOf(b); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j) || a.localeCompare(b); });
+    var byType = types.map(function (ty) { return { type: ty, all: open.filter(function (x) { return x.type === ty; }).length, hex: open.filter(function (x) { return x.type === ty && x.grp === 'HEX Q2 2026'; }).length }; });
+    // selected-type metrics
+    var sel = f.type || 'all', match = function (x) { return sel === 'all' ? !!x.type : x.type === sel; };
+    var pool = rows.filter(function (x) { return match(x) && live(x); });
+    var stCounts = {}; ['Not Started', 'Waiting for Mapping', 'Waiting for Permit to be Approved', 'In Progress', 'Complete'].forEach(function (s) { stCounts[s] = pool.filter(function (x) { return x.status === s; }).length; });
+    var oldest = null; pool.forEach(function (x) { if (x.req != null && x.acq == null && x.status !== 'Complete' && (oldest == null || x.req < oldest)) oldest = x.req; });
+    var detail = pool.filter(function (x) { return (!f.des || K(x.des) === K(f.des)) && (f.grp == null || f.grp === 'all' || x.grp === f.grp); }).map(function (x) {
+      var o = Object.assign({}, x); o.rank = x.acq != null ? -2 : x.req == null ? -1 : t - x.req;
+      o.days = x.req == null ? null : (x.done != null ? x.done - x.req : t - x.req); return o;
+    }).sort(function (a, b) { return b.rank - a.rank; });
+    return { open: uniq(open), openHex: uniq(open.filter(function (x) { return x.grp === 'HEX Q2 2026'; })), byType: byType, types: types, total: pool.length, stCounts: stCounts, oldest: oldest, oldestDays: oldest == null ? null : t - oldest, detail: detail, all: rows };
+  }
+  function permitText(M, wo) {
+    return permitRows(M).filter(function (x) { return x.wo === wo && x.type; }).map(function (x) {
+      return x.type + ': ' + (x.status === 'Waiting for Permit to be Approved' ? 'waiting approval' : x.status.toLowerCase());
+    });
+  }
+
+  /* ---- WO Focus (due dates) ---- */
+  function focus(M, o) {
+    o = o || {}; var t = M.today, ws = mondayOf(t), age = o.age == null ? M.S.agingDays : +o.age, bp = o.track === 'bp', g = o.group == null ? 'HEX Q2 2026' : o.group;
+    var P = projects(M).filter(function (p) { return g === 'all' || (g === '(none)' ? !p.grp : p.grp === g); });
+    var summary = FOCUS_ORDER.map(function (e) {
+      var L = P.filter(function (p) { return ent(M, p) === e; });
+      var dueOf = function (p) { return bp ? p.bp : p.due; }, notSub = function (p) { return bp || p.ifr == null; };
+      return { ent: e, total: L.length,
+        overdue: L.filter(function (p) { return notSub(p) && dueOf(p) != null && dueOf(p) < ws; }).length,
+        thisWeek: L.filter(function (p) { return notSub(p) && between(dueOf(p), ws, ws + 6); }).length,
+        nextWeek: L.filter(function (p) { return notSub(p) && between(dueOf(p), ws + 7, ws + 13); }).length,
+        newWeek: L.filter(function (p) { return p.recv != null && p.recv >= ws; }).length,
+        late: L.filter(function (p) { return p.ifr != null && p.due != null && p.ifr > p.due; }).length,
+        aging: L.filter(function (p) { return p.ifr != null && p.ifr < t - age; }).length };
+    });
+    var RANK = ['Overdue', 'Due This Week', 'Due Next Week', 'Aging w/ Entergy', 'No Date', 'Submitted', 'Later'];
+    var list = P.filter(function (p) { var e = ent(M, p); return e !== ENT_DONE && e !== ENT_CANC; }).map(function (p) {
+      var due = bp ? p.bp : p.due, sub = p.ifr != null && !bp, flag;
+      if (sub) flag = p.ifr < t - age ? 'Aging w/ Entergy' : 'Submitted';
+      else if (due == null) flag = 'No Date'; else if (due < ws) flag = 'Overdue'; else if (due <= ws + 6) flag = 'Due This Week'; else if (due <= ws + 13) flag = 'Due Next Week'; else flag = 'Later';
+      var dv = sub ? (p.due != null ? p.due - p.ifr : null) : (due != null ? due - t : null);
+      return { p: p, wo: p.wo, des: p.des, flag: flag, rank: RANK.indexOf(flag) + 1, due: p.due, ifr: p.ifr, bp: p.bp, dv: dv, dwe: p.ifr != null ? t - p.ifr : null, wp: C.num(p.wp), ent: ent(M, p), grp: p.grp, st: p.st, qa: p.qa, network: p.network, city: p.city, desc: p.desc };
+    });
+    var keep = o.show === 'all' ? list : list.filter(function (x) { return x.rank <= 4; });
+    keep.sort(function (a, b) { return a.rank - b.rank || (a.dv == null ? 99999 : a.dv) - (b.dv == null ? 99999 : b.dv); });
+    return { weekStart: ws, summary: summary, list: keep, allOpen: list.length };
+  }
+
+  /* ---- Designer dashboard + workload ---- */
+  function designerDash(M) {
+    var t = M.today, a = t - 29, P = projects(M);
+    var sent = P.filter(function (p) { return between(p.sent, a, t); }), wp = sumWP(sent);
+    var notStarted = sumWP(P.filter(function (p) { return p.st === 'Not Started'; })), inDesign = sumWP(P.filter(function (p) { return p.st === 'In Design'; }));
+    var un = P.filter(function (p) { return !p.des && UNASSIGNED_ST.indexOf(p.st) >= 0; });
+    var staff = { PC: [], Tyler: [], Conroe: [], Beaumont: [], QC: [] };
+    M.ds.emp.forEach(function (e) {
+      if (!/entergy engineering/i.test(e.proj || 'Entergy Engineering')) return;
+      if (K(e.task) === 'pc') staff.PC.push(e.name); else if (K(e.task) === 'qc') staff.QC.push(e.name); else if (K(e.task) === 'design' && staff[e.loc]) staff[e.loc].push(e.name);
+    });
+    return { window: [a, t], woQC: sent.length, wpQC: wp, perDay: wp / 30, perWeek: wp / 30 * 7, perWO: sent.length ? wp / sent.length : 0,
+      notStarted: notStarted, inDesign: inDesign, monthsToClear: wp ? inDesign / wp : null, unassigned: { n: un.length, wp: sumWP(un), list: un }, staff: staff };
+  }
+  function workload(M) {
+    var t = M.today, P = projects(M), Pd = M.ds.pt, D = M.ds.dict;
+    return P.map(function (p) {
+      var o = M.woMap[p.wo] || {}, pf = 0, gdt = 0, hrs = 0, ix = M.pIdx[K(p.des)];
+      var wi = M.woIdx[p.wo]; (wi != null ? (M.byW[wi] || []) : []).forEach(function (i) {
+        if (Pd.n[i] !== ix) return; hrs += Pd.h[i]; var tk = M.tkey[Pd.t[i]]; if (tk === 'pole foreman') pf += Pd.p[i]; else if (tk === 'gdt') gdt += Pd.p[i];
+      });
+      var flag = 'Good';
+      if (DESIGN_ACTIVE.indexOf(p.st) >= 0) flag = p.due == null ? 'No due date' : p.due < t ? 'Overdue' : p.due === t ? 'Due Today' : (p.due - t) + ' days';
+      var e = M.emp[K(p.des)];
+      return { wo: p.wo, desc: p.desc, des: p.des, st: p.st, ent: ent(M, p), grp: p.grp, wp: C.num(p.wp), due: p.due, bp: p.bp, tsd: p.tsd, prog: p.prog, type: p.type, cost: p.cost, qa: p.qa,
+        pf: pf, gdt: gdt, hrs: hrs, flag: flag, daysLeft: p.due != null ? p.due - t : null, team: e ? e.loc : '', est: o.est || 0, desH: o.desH || 0, left: (o.est || 0) - (o.desH || 0),
+        permits: permitText(M, p.wo), active: DESIGN_ACTIVE.indexOf(p.st) >= 0 };
+    });
+  }
+  function backlog(M, rows) {
+    var t = M.today, by = {};
+    rows.filter(function (r) { return r.active && r.des; }).forEach(function (r) {
+      var b = by[K(r.des)] || (by[K(r.des)] = { des: r.des, team: r.team, wos: 0, wp: 0, left: 0, overdue: 0 });
+      b.wos++; b.wp += r.wp || 0; b.left += Math.max(0, r.left); if (r.flag === 'Overdue') b.overdue++;
+    });
+    projects(M).forEach(function (p) { if (!p.des || !between(p.sent, t - 29, t)) return; var b = by[K(p.des)]; if (b) b.qc30 = (b.qc30 || 0) + (C.num(p.wp) || 0); });
+    return Object.keys(by).map(function (k) { var b = by[k]; b.qc30 = b.qc30 || 0; b.perWeek = b.qc30 / 30 * 7; b.weeks = b.perWeek ? b.wp / b.perWeek : null; b.clear = b.weeks != null ? t + Math.round(b.weeks * 7) : null; return b; });
+  }
+
+  /* ---- New work incoming ---- */
+  function newWork(M) {
+    var S = M.S, nw = S.nw || {}, t = M.today, inTracker = {}; (M.ds.proj || []).forEach(function (p) { inTracker[p.wo] = 1; });
+    var q = S.rates.QC || [2, 0.75];
+    return (M.ds.newwork || []).map(function (x) {
+      var wpN = Math.max(1, C.num(x.wp) || 0), design = M.designFirst + (wpN - 1) * M.designAdd, qaqc = q[0] + (wpN - 1) * q[1];
+      var fs = x.recv, fe = fs == null ? null : workday(fs, Math.round((x.field != null ? x.field : nw.fieldWeeks) * 5));
+      var dDays = Math.ceil(design / nw.hpd), qDays = Math.ceil(qaqc / nw.hpd);
+      var de = fe == null ? null : workday(fe, dDays), qe = de == null ? null : workday(de, (C.num(x.backlog) || 0) + qDays);
+      var status = (qe == null || x.due == null) ? '' : qe > x.due ? 'Late' : (networkdays(qe, x.due) - 1 <= nw.riskDays ? 'At Risk' : 'On Track');
+      return Object.assign({}, x, { design: design, qaqc: qaqc, fs: fs, fe: fe, dDays: dDays, de: de, qDays: qDays, qe: qe, status: status, untilDue: x.due == null ? null : x.due - t, inTracker: x.wo ? !!inTracker[x.wo] : null });
+    });
+  }
+
+  /* ---- HEX project groups ---- */
+  function sp(x) { return String(x || '').replace(/\s+/g, ' ').trim(); }
+  function baseName(desc) {
+    var d0 = sp(desc), d = d0.split('(')[0];
+    var ix = d.toUpperCase().indexOf('SECTION'), p = (ix >= 0 ? d.slice(0, ix) : d).trim();
+    var q = p.toUpperCase().slice(-3) === '-RR' ? p.slice(0, -3).trim() : p;
+    var r = q.slice(-1) === '-' ? q.slice(0, -1).trim() : q; r = r.slice(-1) === '-' ? r.slice(0, -1).trim() : r;
+    var li = r.lastIndexOf(' - '), tail = li >= 0 ? r.slice(li + 3) : '';
+    return tail && /^[0-9]/.test(tail) ? r.slice(0, li).trim() : r;
+  }
+  function hexProjects(M) {
+    var P = projects(M).filter(function (p) { return p.grp === 'HEX Q2 2026'; }), byBase = {};
+    P.forEach(function (p) { var b = baseName(p.desc); (byBase[b] || (byBase[b] = [])).push(p); });
+    return (M.ds.hex || []).map(function (h) {
+      var L = byBase[sp(h.name)] || [], pre = P.filter(function (p) { return (p.desc || '').indexOf(h.name) === 0; });
+      var wp = sumWP(L), del = sumWP(pre.filter(function (p) { return ent(M, p) === ENT_DONE; }));
+      var cost = L.reduce(function (s, p) { return s + (C.num(p.cost) || 0); }, 0);
+      return { name: h.name, des: h.des, first: h.first, req: h.req, wos: L.length, cost: cost, wp: wp, poles: pre.reduce(function (s, p) { return s + (C.num(p.poles) || 0); }, 0),
+        delivered: del, remaining: wp - del, pct: wp ? del / wp : 0, fp: cost > 250000, list: L };
+    });
+  }
+
+  return { TS_ORDER: TS_ORDER, ENT_ORDER: ENT_ORDER, FOCUS_ORDER: FOCUS_ORDER, GROUPS: GROUPS, MILESTONES: MILESTONES, has: has, projects: projects, ent: ent,
+    statusBoard: statusBoard, scope: scope, kpis: kpis, timeline: timeline, permits: permits, permitRows: permitRows, permitText: permitText, focus: focus,
+    designerDash: designerDash, workload: workload, backlog: backlog, newWork: newWork, hexProjects: hexProjects, baseName: baseName, workday: workday, networkdays: networkdays };
+})();
+if (typeof module !== 'undefined') module.exports = Ctl;
+</script>
 <script>
 (function () {
 'use strict';
 var K = Core.key;
 var VIEWS = [
-  ['efficiency', 'Efficiency'], ['workorders', 'Work Orders'], ['designers', 'Designers'], ['qc', 'QC Scorecards'],
-  ['production', 'Production'], ['tasks', 'Task Time'], ['estimator', 'Hour Estimator'], ['data', 'Data Check'], ['settings', 'Settings']
+  ['efficiency', 'Efficiency', 'prod'], ['workorders', 'Work Orders', 'both'], ['designers', 'Designers', 'prod'], ['qc', 'QC Scorecards', 'prod'],
+  ['production', 'Production', 'prod'], ['tasks', 'Task Time', 'prod'], ['estimator', 'Hour Estimator', 'prod'],
+  ['status', 'Status', 'ctl'], ['kpi', 'KPI Summary', 'ctl'], ['timeline', 'Timeline', 'ctl'], ['focus', 'WO Focus', 'ctl'], ['workload', 'Workload', 'ctl'],
+  ['permits', 'Permits', 'ctl'], ['newwork', 'New Work', 'ctl'], ['hex', 'HEX Projects', 'ctl'],
+  ['data', 'Data Check', 'both'], ['settings', 'Settings', 'both']
 ];
 var App = {
   lookup: null, ds: null, M: null, meta: null, saved: null, view: 'efficiency', sort: {},
   caps: { db: null, assets: null, user: null, downloads: null }, canEdit: false, uid: null,
-  ui: { eff: {}, wo: {}, des: {}, qc: {}, prod: {}, tasks: {}, est: {}, data: {} }
+  ui: { eff: {}, wo: {}, des: {}, qc: {}, prod: {}, tasks: {}, est: {}, data: {}, st: {}, kpi: {}, tl: {}, fo: {}, wl: {}, pm: {}, nw: {}, hx: {} }
 };
 window.__app = App;
 
@@ -732,7 +1110,7 @@ function opt(v, label, sel) { return '<option value="' + esc(v) + '"' + (String(
 function sel(id, f, options, cur, label) {
   return '<label class="f" for="' + id + '">' + esc(label) + '<select id="' + id + '" data-f="' + f + '">' + options.map(function (o) { return Array.isArray(o) ? opt(o[0], o[1], cur) : opt(o, o, cur); }).join('') + '</select></label>';
 }
-function people() { return App.M.ds.dict.p.filter(Boolean).slice().sort(); }
+function people() { return App.M.people.slice(); }
 function locations() { var s = {}; App.M.ds.emp.forEach(function (e) { if (e.loc) s[e.loc] = 1; }); return Object.keys(s).sort(); }
 function locOk(name, loc) { if (!loc || loc === 'all') return true; var e = emp(name); return !!e && e.loc === loc; }
 
@@ -848,7 +1226,11 @@ function exportCSV(id) {
 
 /* ---------------- shell ---------------- */
 function renderTabs() {
-  $('#tabs').innerHTML = VIEWS.map(function (v) { return '<a href="#' + v[0] + '"' + (App.view === v[0] ? ' class="on" aria-current="page"' : '') + '>' + esc(v[1]) + '</a>'; }).join('');
+  var cur = VIEWS.filter(function (v) { return v[0] === App.view; })[0];
+  if (cur && cur[2] !== 'both') App.section = cur[2]; App.section = App.section || 'prod';
+  var sw = '<span class="seg" role="group" aria-label="Section"><button type="button" data-sec="prod"' + (App.section === 'prod' ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>Production</button><button type="button" data-sec="ctl"' + (App.section === 'ctl' ? ' class="on" aria-pressed="true"' : ' aria-pressed="false"') + '>Project Controls</button></span>';
+  $('#tabs').innerHTML = sw + VIEWS.filter(function (v) { return v[2] === App.section || (v[2] === 'both' && v[0] !== 'workorders') || (v[0] === 'workorders' && App.section === 'prod'); })
+    .map(function (v) { return '<a href="#' + v[0] + '"' + (App.view === v[0] ? ' class="on" aria-current="page"' : '') + '>' + esc(v[1]) + '</a>'; }).join('');
 }
 function renderInfo() {
   var el = $('#datainfo');
@@ -857,7 +1239,8 @@ function renderInfo() {
   var who = m.uploaderName ? ' by ' + esc(m.uploaderName) : '';
   var when = m.uploadedAt ? new Date(m.uploadedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   var scope = m.local ? ' <span class="pill warn">this device only</span>' : '';
-  var saved = m.lastModified ? new Date(m.lastModified).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+  var lmv = m.lastModified && typeof m.lastModified === 'object' ? Math.max.apply(null, Object.keys(m.lastModified).map(function (k) { return m.lastModified[k] || 0; }).concat([0])) : m.lastModified;
+  var saved = lmv ? new Date(lmv).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
   el.innerHTML = '<b>' + esc(m.fileName || App.ds.file || 'Workbook') + '</b> · ' + (saved ? 'file saved ' + esc(saved) + ' · ' : when ? 'uploaded ' + esc(when) + who + ' · ' : '') + 'time logged through ' + fd(c.maxDay) + scope;
   el.title = el.textContent;
 }
@@ -866,6 +1249,8 @@ function render() {
   renderTabs(); renderInfo();
   var main = $('#main');
   if (!App.M) { main.innerHTML = emptyState(); bindDrop(); return; }
+  if (!App.M.N && ['efficiency', 'designers', 'production', 'tasks'].indexOf(App.view) >= 0) { main.innerHTML = '<div class="drop"><h2>No time entries loaded</h2><p>Upload the PC Production Tracker or PC Tracker workbook; both carry the Production Tracker sheet.</p><button class="btn primary" data-act="upload" type="button">Choose workbook</button></div>'; return; }
+  if (!App.M.ds.sc.length && App.view === 'qc') { main.innerHTML = '<div class="drop"><h2>No QC scorecards loaded</h2><p>The QC scorecards come from the Scorecard sheet in the PC Production Tracker workbook. Upload it once and they stay loaded when you upload the PC Tracker.</p><button class="btn primary" data-act="upload" type="button">Choose workbook</button></div>'; return; }
   var a = document.activeElement, aid = a && a.id, s0 = a && a.selectionStart, s1 = a && a.selectionEnd;
   var y = window.scrollY;
   var html;
@@ -879,16 +1264,16 @@ function render() {
 }
 function emptyState() {
   var canShare = !!App.caps.assets;
-  return '<div class="drop" id="drop"><h2>Load your production tracker</h2>' +
-    '<p>Drop the PC Production Tracker workbook (.xlsx) here or choose it from your computer. Everything is recalculated from the Production Tracker, WO Hours, Project Tracker, Scorecard and Employee List sheets.</p>' +
-    '<button class="btn primary" data-act="upload" type="button">Choose workbook</button>' +
+  return '<div class="drop" id="drop"><h2>Load your trackers</h2>' +
+    '<p>Drop <b>PC Production Tracker.xlsx</b>, <b>PC Tracker.xlsx</b>, or both here, or choose them from your computer. Each sheet is read from whichever file has it, and a sheet missing from a later upload keeps its last version.</p>' +
+    '<button class="btn primary" data-act="upload" type="button">Choose workbooks</button>' +
     '<p style="margin-top:16px;font-size:12px">' + (canShare ? 'When you upload, everyone who opens this app sees the new data.' : 'Uploads stay in this browser unless you have edit access to the app.') + '</p></div>';
 }
 function bindDrop() {
   var d = $('#drop'); if (!d) return;
   d.addEventListener('dragover', function (e) { e.preventDefault(); d.classList.add('over'); });
   d.addEventListener('dragleave', function () { d.classList.remove('over'); });
-  d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); var f = e.dataTransfer.files[0]; if (f) handleFile(f); });
+  d.addEventListener('drop', function (e) { e.preventDefault(); d.classList.remove('over'); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
 }
 
 /* ---------------- EFFICIENCY ---------------- */
@@ -967,6 +1352,8 @@ function woFiltered(u, skip) {
     if (u.st && skip !== 'st' && o.st !== u.st) return false;
     if (u.bud && skip !== 'bud' && o.budget !== u.bud) return false;
     if (u.prog && o.prog !== u.prog) return false;
+    if (u.ent && o.ent !== u.ent) return false;
+    if (u.grp != null && u.grp !== 'all' && (o.grp || '') !== (u.grp === '__none' ? '' : u.grp)) return false;
     if (u.team && o.team !== u.team) return false;
     if (q && (o.wo + ' ' + o.desc + ' ' + o.des + ' ' + o.orig).toLowerCase().indexOf(q) < 0) return false;
     return true;
@@ -988,6 +1375,7 @@ function viewWorkOrders() {
     sel('woSt', 'wo.st', [['', 'All statuses']].concat(Object.keys(stOpts).sort()), u.st || '', 'WO status') +
     sel('woProg', 'wo.prog', [['', 'All programs']].concat(Object.keys(progs).sort()), u.prog || '', 'Program') +
     sel('woTeam', 'wo.team', [['', 'All teams']].concat(locations()), u.team || '', 'Team') +
+    (Ctl.has(M) ? sel('woEnt', 'wo.ent', [['', 'All Entergy statuses']].concat(Ctl.ENT_ORDER.concat(['Cancelled'])), u.ent || '', 'Entergy status') + grpSel('woGrp', 'wo.grp', u.grp == null ? 'all' : u.grp, 'Group') : '') +
     sel('woLog', 'wo.logged', [['all', 'All work orders'], ['yes', 'With time logged']], u.logged, 'Show') + '</div>';
   h += '<div class="chips">' + '<button class="chip' + (!u.bud ? ' on' : '') + '" data-act="bud" data-v="">All <b>' + forChips.length + '</b></button>' +
     BUDGETS.map(function (b) { var t = budgetTone(b); return '<button class="chip' + (u.bud === b ? ' on' : '') + '" data-act="bud" data-v="' + esc(b) + '">' + (t ? '<span class="dot" style="background:var(--' + t + ')"></span>' : '') + esc(b) + ' <b>' + (cnt[b] || 0) + '</b></button>'; }).join('') + '</div>';
@@ -999,6 +1387,7 @@ function viewWorkOrders() {
     { k: 'wo', l: 'WO', f: function (o) { return '<span class="mono">' + esc(o.wo) + '</span>' + (o.unlisted ? ' <span class="pill">not in WO Hours</span>' : ''); } },
     { k: 'desc', l: 'Description', wrap: 1 }, { k: 'des', l: 'Designer' },
     { k: 'st', l: 'Status', f: function (o) { return o.st ? esc(o.st) : '<span class="muted">—</span>'; } },
+    { k: 'ent', l: 'Entergy status', f: function (o) { return o.ent ? pill(o.ent, entTone(o.ent)) : '<span class="muted">—</span>'; }, csv: function (o) { return o.ent; } },
     { k: 'wp', l: 'WP', n: 1, f: function (o) { return o.wp == null ? '—' : fh(o.wp, 0); } },
     { k: 'est', l: 'Est hrs', n: 1, f: function (o) { return fh(o.est); } },
     { k: 'desH', l: 'Designer hrs', n: 1, f: function (o) { return fh(o.desH); } },
@@ -1010,6 +1399,7 @@ function viewWorkOrders() {
     { k: 'estQC', l: 'Est QC', n: 1, f: function (o) { return fh(o.estQC); } },
     { k: 'actual', l: 'Actual hrs', n: 1, f: function (o) { return fh(o.actual); } },
     { k: 'orig', l: 'Original WO', f: function (o) { return o.orig ? '<span class="mono">' + esc(o.orig) + '</span>' : ''; } },
+    { k: 'grp', l: 'Group' }, { k: 'due', l: 'Design due', v: function (o) { return o.pj ? o.pj.due : null; }, f: function (o) { return o.pj ? fd(o.pj.due) : ''; }, csv: function (o) { return o.pj ? Core.dayToISO(o.pj.due) : ''; } },
     { k: 'team', l: 'Team' }
   ];
   h += '<div class="panel"><div class="panel-h"><h3>' + list.length + ' work order' + (list.length === 1 ? '' : 's') + '</h3>' + csvBtn('wo') + '</div>' +
@@ -1021,7 +1411,7 @@ function viewWODetail(wo) {
   var full = u.person ? Core.woDetail(M, wo, '') : D;
   var h = '<div class="head"><div><div class="crumbs"><a href="#workorders" data-act="woBack">Work orders</a><span class="arrow">›</span><span>' + esc(wo) + '</span></div>' +
     '<h2 class="mono" style="font-family:var(--f-display);font-size:34px">WO ' + esc(wo) + '</h2><p class="sub">' + esc(o.desc || 'No description') + '</p>' +
-    '<div class="row" style="margin-top:8px">' + (o.st ? pill(o.st, 'acc') : '') + ' ' + pill(o.budget, budgetTone(o.budget)) + ' ' + (o.prog ? pill(o.prog) : '') + (o.unlisted ? ' <span class="pill warn">not in WO Hours sheet</span>' : '') + '</div></div>' +
+    '<div class="row" style="margin-top:8px">' + (o.st ? pill(o.st, 'acc') : '') + ' ' + (o.ent ? pill('Entergy: ' + o.ent, entTone(o.ent)) + ' ' : '') + (o.grp ? pill(o.grp) + ' ' : '') + pill(o.budget, budgetTone(o.budget)) + ' ' + (o.prog ? pill(o.prog) : '') + (o.unlisted ? ' <span class="pill warn">not in WO Hours sheet</span>' : '') + '</div></div>' +
     '<div class="row"><button class="btn" data-act="woBack" type="button">← All work orders</button>' + (o.wp ? '<button class="btn" data-act="toEst" data-wo="' + esc(wo) + '" type="button">Estimate this WO</button>' : '') + '</div></div>';
   h += '<div class="stack"><div class="kpis">' + kpi('Est design hrs', fh(o.est)) + kpi('Designer hrs', fh(o.desH)) +
     kpi('Remaining', '<span class="' + (o.remain < 0 ? 'down' : '') + '">' + fh(o.remain) + '</span>') + kpi('Utilization', pct(o.util, 0), o.budget) +
@@ -1047,6 +1437,16 @@ function viewWODetail(wo) {
     dd('Work points', o.wp == null ? '—' : fh(o.wp, 0)) + dd('Target start', fd(o.tsd)) + dd('First charge', fd(o.first)) + dd('Last charge', fd(o.last)) +
     dd('Cost estimate', o.cost == null ? '—' : '$' + fh(o.cost, 0)) + dd('Man-hours (Entergy)', o.mh == null ? '—' : fh(o.mh)) + dd('Sent to QAQC', fd(o.sent)) + dd('QA/QC', esc(o.qa || '—')) + dd('Original WO', o.orig ? woLink(o.orig) : '—') + dd('QC reviews', o.qcCount) +
     '</dl></div>' + (fam || '<div class="panel"><div class="panel-h"><h3>WO number history</h3></div><p class="muted">This work order has not been re-numbered.</p></div>') + '</div>';
+  // milestones + permits (PC Tracker)
+  var pj = o.pj;
+  if (pj && (pj.recv != null || pj.due != null || pj.sent != null)) {
+    var ms = [['Received', pj.recv], ['Sent to RE', pj.rev], ['Back from RE', pj.back], ['Design due', pj.due], ['Sent to QC', pj.sent], ['IFR / Tech Review', pj.ifr], ['Blue packet (forecast)', pj.bp], ['Approved', pj.appr], ['Sent to construction', pj.net]].filter(function (m) { return m[1] != null; });
+    var pmt = (M.ds.permits ? Ctl.permitRows(M).filter(function (x) { return x.wo === wo && x.type; }) : []);
+    h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Milestones</h3>' + (pj.due != null && pj.ifr == null && pj.due < M.today ? pill('Design overdue ' + (M.today - pj.due) + ' d', 'bad') : '') + '</div><div class="steps">' +
+      ms.sort(function (a, b) { return a[1] - b[1]; }).map(function (m) { return '<div class="step' + (m[1] > M.today ? ' future' : '') + '"><b>' + fd(m[1]) + '</b><span>' + esc(m[0]) + '</span></div>'; }).join('') + '</div>' +
+      '<dl class="dl" style="margin-top:12px">' + dd('PoleCount', pj.poles == null ? '—' : fh(pj.poles, 0)) + dd('Network', esc(pj.network || '—')) + dd('City', esc(pj.city || '—')) + dd('Maximo status', esc(pj.maximo || '—')) + '</dl></div>' +
+      '<div class="panel"><div class="panel-h"><h3>Permits</h3></div>' + (pmt.length ? table('wopm', [{ k: 'type', l: 'Type' }, { k: 'req', l: 'Requested', f: function (r) { return fd(r.req); } }, { k: 'acq', l: 'Acquired', f: function (r) { return fd(r.acq); } }, { k: 'done', l: 'Completed', f: function (r) { return fd(r.done); } }, { k: 'status', l: 'State', f: function (r) { return pill(r.status, r.status === 'Complete' ? 'good' : 'warn'); } }], pmt, {}) : '<p class="muted">No permits on the Permit Tracker for this WO.</p>') + '</div></div>';
+  }
   // person filter + tasks
   var plist = full.people.map(function (p) { return p.name; });
   var taskCols = [{ k: 'task', l: 'Task' }, { k: 'b', l: 'Billable', n: 1, f: function (r) { return fh(r.b); } }, { k: 'n', l: 'Non-billable', n: 1, f: function (r) { return fh(r.n); } },
@@ -1285,6 +1685,11 @@ function viewData() {
   var h = '<div class="head"><div><h2>Data check</h2><p class="sub">What the app read from ' + esc(M.ds.file || 'the workbook') + ', and things in the sheets worth cleaning up.</p></div><div class="row"><button class="btn primary" data-act="upload" type="button">Upload a newer workbook</button></div></div>';
   h += '<div class="stack"><div class="kpis">' + kpi('Time entries', c.entries.toLocaleString()) + kpi('Date range', fd(c.minDay, false) + ' – ' + fd(c.maxDay)) + kpi('Registered WOs', c.wos) + kpi('QC scorecards', c.scorecards) + kpi('Employees', c.employees) + '</div>';
   if (M.ds.warn && M.ds.warn.length) h += '<div class="note">' + M.ds.warn.map(esc).join('<br>') + '</div>';
+  var SRC = [['pt', 'Production Tracker (time entries)'], ['proj', 'Project Tracker'], ['woh', 'WO Hours'], ['fam', 'WO Number Tracker'], ['sc', 'QC Scorecard'], ['emp', 'Employee List'], ['permits', 'Permit Tracker'], ['newwork', 'New Work Incoming'], ['hex', 'HEX WO Name Groups'], ['statusMap', 'Entergy status mapping (Validations)'], ['notes', 'Timeline comments'], ['cfg', 'Hour rates (WO HR Estimator)']];
+  var src = M.ds.src || {};
+  h += '<div class="panel"><div class="panel-h"><h3>Where each sheet came from</h3></div>' + table('src', [{ k: 'l', l: 'Sheet' }, { k: 'file', l: 'File', f: function (r) { return r.file ? esc(r.file) : '<span class="flag">not loaded yet</span>'; } }, { k: 'at', l: 'Read', f: function (r) { return r.at ? esc(new Date(r.at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : ''; } }],
+    SRC.map(function (x) { var s = src[x[0]] || {}; return { l: x[1], file: s.file || (x[0] === 'woh' && M.ds.projFull ? '' : ''), at: s.at }; }).filter(function (r) { return !(r.l === 'WO Hours' && !r.file && M.ds.projFull); }), {}) +
+    (M.ds.ptClean ? '<p class="sub" style="margin-top:8px">Same cleanup as your Production Tracker query: ' + M.ds.ptClean.dropped.toLocaleString() + ' entries from former staff and ' + M.ds.ptClean.otherClient.toLocaleString() + ' entries for other clients (AEP, CenterPoint…) are left out of efficiency, production and designer views, but still count in work order hours. Names are matched across sheets (for example "Nicholas Millunzi" = "Nick Millunzi", "Jacob Stanley" = "Corben Stanley").</p>' : '') + '</div>';
   h += '<div class="panel"><div class="panel-h"><h3>Cleanup list</h3></div><div class="stack" style="gap:0">' + checks.map(function (k) {
     var tone = k.n === 0 ? 'good' : (k.id === 'zeroh' || k.id === 'nowo') ? 'warn' : 'bad';
     return '<div class="row" style="align-items:flex-start;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:nowrap"><div class="check-n" style="color:var(--' + tone + ')">' + k.n + '</div><div style="min-width:0;flex:1"><b>' + esc(k.label) + '</b><div class="sub">' + esc(k.hint) + '</div>' +
@@ -1320,7 +1725,14 @@ function viewSettings() {
     '<label class="f" for="sOver">"Over Budget" above (%)<input type="number" id="sOver" step="1" value="' + Math.round(S.thresh.over * 100) + '" style="width:120px"' + dis + '></label></div>' +
     '<label class="f" for="sTarget">Efficiency target (%)<input type="number" id="sTarget" step="1" value="' + Math.round((S.effTarget || .75) * 100) + '" style="width:120px"' + dis + '></label>' +
     '<label class="f" for="sRoll">WO roll-up<select id="sRoll"' + dis + '>' + opt('original', 'Include the Original WO from WO Hours (matches the workbook)', S.rollup) + opt('family', 'Include every earlier WO number from the WO Number Tracker', S.rollup) + '</select></label>' +
-    '<label class="f" for="sProd">Production week 1 starts<input type="date" id="sProd" value="' + Core.dayToISO(S.prodStart) + '"' + dis + '></label></div></div></div>';
+    '<label class="f" for="sProd">Production / timeline week 1 starts<input type="date" id="sProd" value="' + Core.dayToISO(S.prodStart) + '"' + dis + '></label></div></div></div>';
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Project Controls</h3></div><div class="stack" style="gap:12px">' +
+    '<label class="f" for="sDl">HEX deadline (Status scope panel)<input type="date" id="sDl" value="' + Core.dayToISO(S.deadline) + '"' + dis + '></label>' +
+    '<label class="f" for="sAge">WO Focus "aging with Entergy" after (days)<input type="number" id="sAge" value="' + S.agingDays + '" style="width:120px"' + dis + '></label></div></div>' +
+    '<div class="panel"><div class="panel-h"><h3>New work schedule</h3><span class="muted">from the New Work Incoming sheet</span></div><div class="stack" style="gap:12px">' +
+    '<label class="f" for="sFw">Default fielding time (weeks)<input type="number" step="0.5" id="sFw" value="' + S.nw.fieldWeeks + '" style="width:120px"' + dis + '></label>' +
+    '<label class="f" for="sHpd">Productive hours per workday<input type="number" step="0.5" id="sHpd" value="' + S.nw.hpd + '" style="width:120px"' + dis + '></label>' +
+    '<label class="f" for="sRisk">"At Risk" buffer (workdays before due)<input type="number" id="sRisk" value="' + S.nw.riskDays + '" style="width:120px"' + dis + '></label></div></div></div>';
   h += '<div class="panel"><div class="panel-h"><h3>Ramp schedule</h3><span class="muted">learning multiplier by designer day</span></div><div class="row">' + S.ramp.map(function (x, i) {
     return '<label class="f" for="rp' + i + '_0">From day<input type="number" id="rp' + i + '_0" value="' + x[0] + '" style="width:90px"' + dis + '></label><label class="f" for="rp' + i + '_1">× multiplier<input type="number" step="0.1" id="rp' + i + '_1" value="' + x[1] + '" style="width:90px"' + dis + '></label><span style="width:12px"></span>';
   }).join('') + '</div></div>';
@@ -1332,15 +1744,255 @@ function readSettingsForm() {
   var res = ['PF', 'GDT', 'Corrections', 'Max/Del', 'QC', 'PC', 'PM'], rates = {};
   res.forEach(function (k) { var id = k.replace(/\W/g, ''); rates[k] = [+$('#r_' + id + '_0').value || 0, +$('#r_' + id + '_1').value || 0]; });
   var ramp = App.M.S.ramp.map(function (_, i) { return [+$('#rp' + i + '_0').value || 0, +$('#rp' + i + '_1').value || 1]; }).sort(function (a, b) { return a[0] - b[0]; });
-  return { rates: rates, ramp: ramp, thresh: { near: (+$('#sNear').value || 85) / 100, over: (+$('#sOver').value || 100) / 100 }, effTarget: (+$('#sTarget').value || 75) / 100, rollup: $('#sRoll').value, prodStart: Core.toDay($('#sProd').value) || Core.DEFAULTS.prodStart };
+  return { rates: rates, ramp: ramp, thresh: { near: (+$('#sNear').value || 85) / 100, over: (+$('#sOver').value || 100) / 100 }, effTarget: (+$('#sTarget').value || 75) / 100, rollup: $('#sRoll').value, prodStart: Core.toDay($('#sProd').value) || Core.DEFAULTS.prodStart,
+    deadline: Core.toDay($('#sDl').value) || Core.DEFAULTS.deadline, agingDays: +$('#sAge').value || 30, nw: { fieldWeeks: +$('#sFw').value || 2, hpd: +$('#sHpd').value || 8, riskDays: +$('#sRisk').value || 0 } };
 }
 
-var VIEW_FN = { efficiency: viewEfficiency, workorders: viewWorkOrders, designers: viewDesigners, qc: viewQC, production: viewProduction, tasks: viewTasks, estimator: viewEstimator, data: viewData, settings: viewSettings };
+/* ================= PROJECT CONTROLS (PC Tracker) ================= */
+function needPC() {
+  return '<div class="drop"><h2>Upload the PC Tracker workbook</h2><p>This screen is built from the PC Tracker\'s Project Tracker, Permit Tracker and New Work Incoming sheets. Upload <b>PC Tracker.xlsx</b> (you can pick it together with the Production Tracker workbook).</p><button class="btn primary" data-act="upload" type="button">Choose workbook</button></div>';
+}
+function grpSel(id, f, cur, label, extra) {
+  return sel(id, f, (extra || []).concat(Ctl.GROUPS.map(function (g) { return [g[0] === '' ? '__none' : g[0], g[1]]; })), cur === '' ? '__none' : cur, label || 'Project group');
+}
+function grpVal(v) { return v === '__none' ? '' : v == null ? 'all' : v; }
+function entTone(e) { return /^Complete/.test(e) ? 'good' : e === 'Cancelled' ? '' : /Approved/.test(e) ? 'acc' : /Waiting|Hold/.test(e) ? 'warn' : e === 'New' ? '' : 'acc'; }
+function hbar(rows, opts) {
+  // horizontal bars: rows [{label, value, sub}] — compact, theme-aware
+  var max = Math.max.apply(null, rows.map(function (r) { return r.value || 0; }).concat([1]));
+  return '<div class="hbars">' + rows.map(function (r) {
+    return '<div class="hb"><span class="hb-l" title="' + esc(r.label) + '">' + esc(r.label) + '</span><span class="hb-t"><i style="width:' + ((r.value || 0) / max * 100) + '%;background:' + (r.color || opts && opts.color || 'var(--accent)') + '"></i></span><span class="hb-v">' + fh(r.value, 0) + (r.sub ? ' <span class="muted">' + r.sub + '</span>' : '') + '</span></div>';
+  }).join('') + '</div>';
+}
+
+/* ---- Status dashboard ---- */
+function viewStatus() {
+  var M = App.M; if (!Ctl.has(M)) return needPC();
+  var u = App.ui.st = App.ui.st || {}; var g = grpVal(u.g == null ? 'all' : u.g);
+  var B = Ctl.statusBoard(M), ph = B.phases[g] || B.phases.all;
+  var tsRows = B.ts.filter(function (r) { return (r.n[g] || 0) > 0 || u.zero; });
+  var tot = { n: sum(B.ts, function (r) { return r.n[g]; }), wp: sum(B.ts, function (r) { return r.wp[g]; }) };
+  var h = '<div class="head"><div><h2>Status dashboard</h2><p class="sub">Every work order on the Project Tracker by TS status and the matching Entergy status, with work points. Entergy statuses come from the Validations sheet.</p></div><div class="row">' +
+    grpSel('stG', 'st.g', u.g == null ? 'all' : u.g) + '</div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Work orders', tot.n, fh(tot.wp, 0) + ' work points', 'hero') +
+    kpi('WP still to design', fh(ph.remaining, 0), 'New + Design + Contractor Tech Review') + kpi('WP with Entergy', fh(ph.withEntergy, 0), 'submitted, waiting or approved') + kpi('WP sent to construction', fh(ph.complete, 0)) +
+    kpi('Active WOs', sum(B.ent.filter(function (r) { return !/^Complete|Cancelled/.test(r.ent); }), function (r) { return r.n[g]; })) + '</div>';
+  // Entergy status across groups
+  var cols = [{ k: 'ent', l: 'Entergy status', f: function (r) { return pill(r.ent, entTone(r.ent)); }, csv: function (r) { return r.ent; } }];
+  [['all', 'All'], ['', 'Non-HEX'], ['HEX Q2 2026', 'HEX Q2 2026'], ['HEX Q2 2027', 'HEX Q2 2027']].forEach(function (c) {
+    cols.push({ k: 'n' + c[0], l: c[1] + ' WOs', n: 1, v: function (r) { return r.n[c[0]] || 0; }, f: function (r) { return r.n[c[0]] || '<span class="muted">0</span>'; } });
+    cols.push({ k: 'w' + c[0], l: c[1] + ' WP', n: 1, v: function (r) { return r.wp[c[0]] || 0; }, f: function (r) { return fh(r.wp[c[0]] || 0, 0); } });
+  });
+  var entRows = B.ent.filter(function (r) { return r.ent !== 'Cancelled'; });
+  var foot = ['Total (excl. cancelled)']; [['all'], [''], ['HEX Q2 2026'], ['HEX Q2 2027']].forEach(function (c) { foot.push(String(sum(entRows, function (r) { return r.n[c[0]]; }))); foot.push(fh(sum(entRows, function (r) { return r.wp[c[0]]; }), 0)); });
+  h += '<div class="panel"><div class="panel-h"><h3>By Entergy status</h3>' + csvBtn('stent') + '</div>' + table('stent', cols, entRows, { csv: 'entergy-status', foot: foot }) + '</div>';
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Work orders by Entergy status</h3><span class="muted">' + esc(grpLabel(g)) + '</span></div>' +
+    hbar(entRows.map(function (r) { return { label: r.ent, value: r.n[g] || 0, sub: fh(r.wp[g] || 0, 0) + ' WP', color: 'var(--' + (entTone(r.ent) === 'good' ? 'good' : entTone(r.ent) === 'warn' ? 'warn' : 'accent') + ')' }; })) + '</div>' +
+    '<div class="panel"><div class="panel-h"><h3>Work orders by TS status</h3><label style="font-size:12px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="stZero" data-f="st.zero"' + (u.zero ? ' checked' : '') + '> show empty statuses</label></div>' +
+    table('stts', [{ k: 'ts', l: 'TS status', f: function (r) { return '<a href="#workorders" data-wost="' + esc(r.ts) + '">' + esc(r.ts) + '</a>'; }, csv: function (r) { return r.ts; } }, { k: 'ent', l: 'Entergy status', f: function (r) { return r.ent ? esc(r.ent) : '<span class="flag">not mapped</span>'; } },
+      { k: 'n', l: '# WOs', n: 1, v: function (r) { return r.n[g] || 0; }, f: function (r) { return r.n[g] || 0; } }, { k: 'wp', l: 'Work points', n: 1, v: function (r) { return r.wp[g] || 0; }, f: function (r) { return fh(r.wp[g] || 0, 0); } }], tsRows,
+      { csv: 'ts-status', foot: ['Total', '', String(tot.n), fh(tot.wp, 0)] }) + '</div></div>';
+  // scope vs deadline
+  var sg = u.sg || 'HEX Q2 2026', S = Ctl.scope(M, sg, M.S.deadline);
+  h += '<div class="panel"><div class="panel-h"><div><h3>Scope against the deadline</h3><p class="sub">Deadline ' + fd(S.deadline) + ' (change it in Settings). Movement counts work points since the deadline, through today.</p></div>' +
+    sel('stSG', 'st.sg', [['HEX Q2 2026', 'HEX Q2 2026'], ['HEX Q2 2027', 'HEX Q2 2027']], sg, 'Group') + '</div><div class="kpis">' +
+    kpi('Work orders received', S.wos) + kpi('Poles originally received', fh(S.poles, 0), 'PoleCount') + kpi('Work points after inspection', fh(S.wp, 0), '<span class="' + (S.net < 0 ? 'down' : 'up') + '">' + (S.net > 0 ? '+' : '') + fh(S.net, 0) + ' vs poles</span>') +
+    kpi('WP to Tech Review by deadline', fh(S.trByDeadline, 0), pct(S.pctTR) + ' of scope') + kpi('WP remaining at deadline', fh(S.remainAtDeadline, 0), pct(S.pctRemain) + ' of scope') + kpi('Released to construction by deadline', fh(S.releasedByDeadline, 0)) + '</div>' +
+    '<div class="kpis" style="margin-top:10px">' + kpi('Since deadline: sent to QA/QC', fh(S.sinceQC.wp, 0) + ' WP', S.sinceQC.n + ' work orders') + kpi('Since deadline: reached IFR / Tech Review', fh(S.sinceIFR.wp, 0) + ' WP', S.sinceIFR.n + ' work orders') + kpi('Since deadline: approved by Entergy', fh(S.sinceAppr.wp, 0) + ' WP', S.sinceAppr.n + ' work orders') + '</div></div></div>';
+  return h;
+}
+function grpLabel(g) { var x = Ctl.GROUPS.filter(function (y) { return y[0] === g; })[0]; return x ? x[1] : g; }
+
+/* ---- KPI summary ---- */
+function viewKPI() {
+  var M = App.M; if (!Ctl.has(M)) return needPC();
+  var u = App.ui.kpi = App.ui.kpi || {}; u.weeks = u.weeks || 1; if (u.fg == null) u.fg = 'HEX Q2 2027';
+  var R = Ctl.kpis(M, { weeks: +u.weeks, start: u.start ? Core.toDay(u.start) : null, end: u.end ? Core.toDay(u.end) : null, forecastGroup: grpVal(u.fg) });
+  var h = '<div class="head"><div><h2>KPI summary</h2><p class="sub">Throughput for the look-back period (' + fd(R.period.start, false) + ' – ' + fd(R.period.end) + ', ' + R.period.days + ' days) and for this week so far (' + fd(R.week.start, false) + ' – ' + fd(R.week.end, false) + '). Counts use the milestone dates on the Project Tracker.</p></div><div class="row">' +
+    sel('kW', 'kpi.weeks', [1, 2, 3, 4, 8, 12, 16, 20, 24, 28].map(function (n) { return [n, n + (n === 1 ? ' week' : ' weeks')]; }), u.weeks, 'Look back') +
+    '<label class="f" for="kS">Start (optional)<input type="date" id="kS" data-f="kpi.start" value="' + esc(u.start || '') + '"></label><label class="f" for="kE">End (optional)<input type="date" id="kE" data-f="kpi.end" value="' + esc(u.end || '') + '"></label></div></div>';
+  function pair(l, P, W) { return '<tr><td>' + esc(l) + '</td><td class="n">' + P.n + '</td><td class="n">' + fh(P.wp, 0) + '</td><td class="n">' + W.n + '</td><td class="n">' + fh(W.wp, 0) + '</td></tr>'; }
+  h += '<div class="stack"><div class="grid2"><div class="panel"><div class="panel-h"><h3>Flow</h3></div><div class="tbl-wrap"><table><thead><tr><th></th><th class="n">Period WOs</th><th class="n">Period WP</th><th class="n">This week WOs</th><th class="n">This week WP</th></tr></thead><tbody>' +
+    pair('Received', R.recvP, R.recvW) + pair('Sent to QC', R.qcP, R.qcW) + pair('Sent to Tech Review (IFR)', R.trP, R.trW) + pair('Sent to Network / Construction', R.netP, R.netW) + '</tbody></table></div></div>' +
+    '<div class="panel"><div class="panel-h"><h3>Current workload</h3></div><div class="kpis">' + kpi('Active work orders', R.active.n, fh(R.active.wp, 0) + ' work points') + kpi('HEX Q2 2026 active', R.hexActive.n, fh(R.hexActive.wp, 0) + ' work points') +
+    kpi('Designers with active work', R.designers) + kpi('Avg per designer', fh(R.perDesignerWO, 1) + ' WOs', fh(R.perDesignerWP, 0) + ' work points') + kpi('WOs blocked on permits', R.blocked, 'Hold Pending Permit + Approved - Holding') + kpi('WOs with permits in progress', R.permitsInProgress) + '</div></div></div>';
+  h += '<div class="panel"><div class="panel-h"><div><h3>Throughput and forecast</h3><p class="sub">Work points not yet in QC = New + Design for the selected group. Rates come from the look-back period.</p></div>' + grpSel('kFG', 'kpi.fg', u.fg, 'Forecast for') + '</div><div class="kpis">' +
+    kpi('Avg WOs to QC / week', fh(R.woQCperWk, 1)) + kpi('Avg WP to QC / week', fh(R.wpQCperWk, 0)) + kpi('Avg WP to Tech Review / week', fh(R.wpTRperWk, 0)) + kpi('WP not yet in QC', fh(R.notInQC, 0), esc(grpLabel(grpVal(u.fg)))) +
+    kpi('All in QC by', R.dateQC == null ? '—' : fd(R.dateQC), R.weeksToQC == null ? 'no QC output in period' : fh(R.weeksToQC, 1) + ' weeks', 'hero') + kpi('All in Tech Review by', R.dateTR == null ? '—' : fd(R.dateTR), R.weeksToTR == null ? 'no IFR output in period' : fh(R.weeksToTR, 1) + ' weeks') + '</div></div>';
+  // weekly trend of QC + IFR WP for context
+  var T = Ctl.timeline(M, 'all'), last = T.weeks.slice(-12);
+  h += '<div class="panel"><div class="panel-h"><h3>Work points per week, last 12 weeks</h3></div>' + lineChart({ labels: last.map(function (w) { return fdShort(w.start); }), series: [
+    { name: 'Received', color: 'var(--muted)', values: last.map(function (w) { return w.recv.wp; }), w: 1.5, dash: '4 4' }, { name: 'Sent to QC', color: 'var(--accent)', values: last.map(function (w) { return w.sent.wp; }) },
+    { name: 'Tech Review', color: 'var(--copper)', values: last.map(function (w) { return w.ifr.wp; }) }, { name: 'To construction', color: 'var(--good)', values: last.map(function (w) { return w.net.wp; }) }] }) + '</div></div>';
+  return h;
+}
+
+/* ---- Timeline ---- */
+function viewTimeline() {
+  var M = App.M; if (!Ctl.has(M)) return needPC();
+  var u = App.ui.tl = App.ui.tl || {}; var g = grpVal(u.g == null ? 'all' : u.g); u.unit = u.unit || 'wp';
+  var T = Ctl.timeline(M, g), W = T.weeks, notes = (M.ds.notes || {})[g === 'HEX Q2 2026' ? 'hex' : 'all'] || {};
+  if (g === 'HEX Q2 2026' && !Object.keys(notes).length) notes = (M.ds.notes || {}).all || {};
+  var unit = u.unit, cum = {};
+  var h = '<div class="head"><div><h2>Timeline</h2><p class="sub">Work orders and work points reaching each milestone, week by week since ' + fd(M.S.prodStart) + '. The chart is cumulative, so the gap between lines is work in progress at each stage.</p></div><div class="row">' +
+    grpSel('tlG', 'tl.g', u.g == null ? 'all' : u.g) + sel('tlU', 'tl.unit', [['wp', 'Work points'], ['n', 'Work orders']], unit, 'Count') + '</div></div>';
+  var colors = ['var(--muted)', '#8a7fc0', '#b18bd0', 'var(--accent)', 'var(--copper)', 'var(--warn)', 'var(--good)'];
+  var series = T.milestones.map(function (m, i) { var run = 0; return { name: m[1], color: colors[i], w: i === 0 ? 1.5 : 2, dash: i === 0 ? '4 4' : null, values: W.map(function (w) { run += w[m[0]][unit]; return run; }) }; });
+  T.milestones.forEach(function (m) { cum[m[0]] = sum(W, function (w) { return w[m[0]][unit]; }); });
+  h += '<div class="stack"><div class="kpis">' + T.milestones.map(function (m, i) { return kpi(m[1], fh(cum[m[0]], 0), i ? pct(cum.recv ? cum[m[0]] / cum.recv : null, 0) + ' of received' : (unit === 'wp' ? 'work points' : 'work orders')); }).join('') + '</div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Cumulative ' + (unit === 'wp' ? 'work points' : 'work orders') + '</h3></div>' + lineChart({ labels: W.map(function (w) { return fdShort(w.start); }), series: series, h: 260 }) + '</div>';
+  var cols = [{ k: 'n', l: 'Week', n: 1 }, { k: 'start', l: 'Week of', f: function (w) { return fd(w.start, false); }, csv: function (w) { return Core.dayToISO(w.start); } }];
+  T.milestones.forEach(function (m) {
+    cols.push({ k: m[0] + 'n', l: m[1] + ' (WO)', n: 1, v: function (w) { return w[m[0]].n; }, f: function (w) { return w[m[0]].n || '<span class="muted">0</span>'; } });
+    cols.push({ k: m[0] + 'w', l: m[1] + ' (WP)', n: 1, v: function (w) { return w[m[0]].wp; }, f: function (w) { return w[m[0]].wp ? fh(w[m[0]].wp, 0) : '<span class="muted">0</span>'; } });
+  });
+  cols.push({ k: 'note', l: 'Comments', wrap: 1, nosort: 1, v: function (w) { return notes[w.start] || ''; }, f: function (w) { return esc(notes[w.start] || ''); } });
+  var foot = ['', 'Total']; T.milestones.forEach(function (m) { foot.push(String(sum(W, function (w) { return w[m[0]].n; }))); foot.push(fh(sum(W, function (w) { return w[m[0]].wp; }), 0)); }); foot.push('');
+  h += '<div class="panel"><div class="panel-h"><h3>Week by week</h3>' + csvBtn('tl') + '</div>' + table('tl', cols, W, { sort: { k: 'n', asc: false }, csv: 'timeline-' + (g || 'non-hex'), foot: foot, tall: true }) +
+    '<p class="sub" style="margin-top:8px">Comments come from the timeline sheet in the PC Tracker; edit them there.</p></div></div>';
+  return h;
+}
+
+/* ---- WO Focus ---- */
+function viewFocus() {
+  var M = App.M; if (!Ctl.has(M)) return needPC();
+  var u = App.ui.fo = App.ui.fo || {}; if (u.g == null) u.g = 'HEX Q2 2026'; u.track = u.track || 'dd'; u.show = u.show || 'action'; if (u.age == null) u.age = M.S.agingDays;
+  var g = u.g === '__none' ? '(none)' : u.g;
+  var F = Ctl.focus(M, { group: g, track: u.track, age: +u.age, show: u.show });
+  var groups = [['all', 'All groups']].concat(Ctl.GROUPS.filter(function (x) { return x[0] && x[0] !== 'all'; })).concat([['__none', '(No group)']]);
+  var h = '<div class="head"><div><h2>WO Focus</h2><p class="sub">What is overdue or due soon, week of ' + fd(F.weekStart) + '. Work orders already submitted to Tech Review count as submitted (or aging with Entergy after ' + u.age + ' days) instead of overdue.</p></div><div class="row">' +
+    sel('foT', 'fo.track', [['dd', 'Design due date'], ['bp', 'Blue packet date']], u.track, 'Track by') + sel('foG', 'fo.g', groups, u.g, 'Group') +
+    '<label class="f" for="foA">Aging flag (days)<input type="number" id="foA" data-f="fo.age" value="' + esc(u.age) + '" style="width:110px"></label></div></div>';
+  var T = { total: 0, overdue: 0, thisWeek: 0, nextWeek: 0, newWeek: 0, late: 0, aging: 0 }; F.summary.forEach(function (r) { Object.keys(T).forEach(function (k) { T[k] += r[k]; }); });
+  h += '<div class="stack"><div class="kpis">' + kpi('Overdue', '<span class="' + (T.overdue ? 'down' : '') + '">' + T.overdue + '</span>', 'due before this week', 'hero') + kpi('Due this week', T.thisWeek) + kpi('Due next week', T.nextWeek) +
+    kpi('Aging with Entergy', T.aging, '> ' + u.age + ' days since IFR') + kpi('Submitted late', T.late) + kpi('New this week', T.newWeek) + kpi('Open WOs', T.total) + '</div>';
+  var sc = [{ k: 'ent', l: 'Entergy status' }, { k: 'total', l: 'Total WOs', n: 1 }, { k: 'overdue', l: 'Overdue', n: 1, f: function (r) { return r.overdue ? '<b class="down">' + r.overdue + '</b>' : '0'; } }, { k: 'thisWeek', l: 'Due this week', n: 1 }, { k: 'nextWeek', l: 'Due next week', n: 1 },
+    { k: 'newWeek', l: 'New this week', n: 1 }, { k: 'late', l: 'Submitted late', n: 1 }, { k: 'aging', l: 'Aging w/ Entergy', n: 1 }];
+  h += '<div class="panel"><div class="panel-h"><h3>By Entergy status</h3></div>' + table('fosum', sc, F.summary, { foot: ['Total', T.total, T.overdue, T.thisWeek, T.nextWeek, T.newWeek, T.late, T.aging].map(String) }) + '</div>';
+  var FT = { 'Overdue': 'bad', 'Due This Week': 'warn', 'Due Next Week': 'warn', 'Aging w/ Entergy': 'bad', 'No Date': '', 'Submitted': 'good', 'Later': '' };
+  h += '<div class="panel"><div class="panel-h"><h3>' + F.list.length + ' work order' + (F.list.length === 1 ? '' : 's') + '</h3><div class="row">' + sel('foS', 'fo.show', [['action', 'Needs action'], ['all', 'All open WOs']], u.show, 'Show') + csvBtn('folist') + '</div></div>' +
+    table('folist', [{ k: 'des', l: 'Designer', f: function (r) { return personLink(r.des); }, csv: function (r) { return r.des; } }, { k: 'wo', l: 'WO #', f: function (r) { return woLink(r.wo); }, csv: function (r) { return r.wo; } },
+      { k: 'rank', l: 'Flag', f: function (r) { return pill(r.flag, FT[r.flag]); }, csv: function (r) { return r.flag; } }, { k: 'due', l: 'Design due', f: function (r) { return fd(r.due); }, csv: function (r) { return Core.dayToISO(r.due); } },
+      { k: 'ifr', l: 'Submitted to TR', f: function (r) { return fd(r.ifr); }, csv: function (r) { return Core.dayToISO(r.ifr); } }, { k: 'bp', l: 'Blue packet', f: function (r) { return fd(r.bp); }, csv: function (r) { return Core.dayToISO(r.bp); } },
+      { k: 'dv', l: 'Days vs due', n: 1, f: function (r) { return r.dv == null ? '—' : '<span class="' + (r.dv < 0 ? 'down' : '') + '">' + r.dv + '</span>'; } }, { k: 'dwe', l: 'Days w/ Entergy', n: 1, f: function (r) { return r.dwe == null ? '—' : r.dwe; } },
+      { k: 'wp', l: 'WP', n: 1, f: function (r) { return r.wp == null ? '—' : fh(r.wp, 0); } }, { k: 'ent', l: 'Entergy status' }, { k: 'grp', l: 'Group' }, { k: 'st', l: 'TS status' }, { k: 'qa', l: 'QA/QC' }, { k: 'network', l: 'Network' }, { k: 'city', l: 'City' }, { k: 'desc', l: 'Description', wrap: 1 }],
+      F.list, { go: function (r) { return 'wo:' + r.wo; }, csv: 'wo-focus', tall: true, empty: 'Nothing needs action.' }) + '</div></div>';
+  return h;
+}
+
+/* ---- Workload (Designer Dash + Designer Workload) ---- */
+function viewWorkload() {
+  var M = App.M; if (!Ctl.has(M)) return needPC();
+  var u = App.ui.wl = App.ui.wl || {}; u.show = u.show || 'active';
+  var DD = Ctl.designerDash(M), rows = Ctl.workload(M), BL = Ctl.backlog(M, rows);
+  var h = '<div class="head"><div><h2>Designer workload</h2><p class="sub">Design-phase work (Field Complete through QAQC In Progress) by designer, with output over the last 30 days (' + fd(DD.window[0], false) + ' – ' + fd(DD.window[1]) + '). Budget hours use the same rates as Work Orders.</p></div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('WOs sent to QC, 30 days', DD.woQC, fh(DD.wpQC, 0) + ' work points') + kpi('Avg poles / day', fh(DD.perDay, 1)) + kpi('Avg poles / week', fh(DD.perWeek, 0)) + kpi('Avg poles / WO', fh(DD.perWO, 1)) +
+    kpi('WP not started', fh(DD.notStarted, 0)) + kpi('WP in design', fh(DD.inDesign, 0)) + kpi('Months to clear design', DD.monthsToClear == null ? '—' : fh(DD.monthsToClear, 1), 'at the last-30-day pace', 'hero') +
+    kpi('Unassigned', DD.unassigned.n + ' WOs', fh(DD.unassigned.wp, 0) + ' work points') + '</div>';
+  h += '<div class="panel"><div class="panel-h"><h3>Team</h3></div><div class="grid5">' + [['PC', 'PC'], ['Tyler', 'Tyler designers'], ['Conroe', 'Conroe designers'], ['Beaumont', 'Beaumont designers'], ['QC', 'QAQC']].map(function (x) {
+    return '<div><div class="kpi-l">' + esc(x[1]) + ' <b>' + DD.staff[x[0]].length + '</b></div><div class="names">' + DD.staff[x[0]].map(function (n) { return x[0] === 'PC' || x[0] === 'QC' ? esc(n) : personLink(n); }).join('<br>') + '</div></div>';
+  }).join('') + '</div></div>';
+  h += '<div class="panel"><div class="panel-h"><div><h3>Backlog by designer</h3><p class="sub">Weeks to clear = open design-phase work points ÷ work points that designer sent to QC per week over the last 30 days.</p></div>' + csvBtn('bl') + '</div>' + table('bl', [
+    { k: 'des', l: 'Designer', f: function (r) { return personLink(r.des); }, csv: function (r) { return r.des; } }, { k: 'team', l: 'Team' }, { k: 'wos', l: 'Open WOs', n: 1 }, { k: 'wp', l: 'Open WP', n: 1, f: function (r) { return fh(r.wp, 0); } },
+    { k: 'overdue', l: 'Overdue', n: 1, f: function (r) { return r.overdue ? '<b class="down">' + r.overdue + '</b>' : '0'; } }, { k: 'left', l: 'Budget hrs left', n: 1, f: function (r) { return fh(r.left, 1); } },
+    { k: 'qc30', l: 'WP to QC, 30 d', n: 1, f: function (r) { return fh(r.qc30, 0); } }, { k: 'perWeek', l: 'WP / week', n: 1, f: function (r) { return fh(r.perWeek, 1); } },
+    { k: 'weeks', l: 'Weeks to clear', n: 1, f: function (r) { return r.weeks == null ? '<span class="muted">no QC output</span>' : '<span class="' + (r.weeks > 8 ? 'down' : '') + '">' + fh(r.weeks, 1) + '</span>'; } },
+    { k: 'clear', l: 'Expected clear', f: function (r) { return fd(r.clear); }, csv: function (r) { return Core.dayToISO(r.clear); } }], BL, { sort: { k: 'wp', asc: false }, csv: 'designer-backlog' }) + '</div>';
+  var desOpts = {}; rows.forEach(function (r) { if (r.des) desOpts[r.des] = 1; });
+  var list = rows.filter(function (r) { return (u.show === 'all' || (u.show === 'active' ? r.active : u.show === 'overdue' ? r.flag === 'Overdue' : u.show === 'unassigned' ? !r.des && ['In Design', 'Hold-Add a Note', 'Not Started', 'Ready to Field (Designer)', 'Ready to Field'].indexOf(r.st) >= 0 : true)) && (!u.des || r.des === u.des); });
+  var FL = function (f) { return f === 'Overdue' ? 'bad' : f === 'Due Today' ? 'warn' : f === 'Good' ? 'good' : /days/.test(f) && parseInt(f, 10) <= 7 ? 'warn' : ''; };
+  h += '<div class="panel"><div class="panel-h"><h3>' + list.length + ' work orders</h3><div class="row">' + sel('wlS', 'wl.show', [['active', 'Design phase'], ['overdue', 'Overdue only'], ['unassigned', 'Unassigned'], ['all', 'All work orders']], u.show, 'Show') +
+    sel('wlD', 'wl.des', [['', 'All designers']].concat(Object.keys(desOpts).sort()), u.des || '', 'Designer') + csvBtn('wl') + '</div></div>' + table('wl', [
+      { k: 'wo', l: 'WO', f: function (r) { return woLink(r.wo); }, csv: function (r) { return r.wo; } }, { k: 'des', l: 'Designer', f: function (r) { return r.des ? esc(r.des) : '<span class="flag">unassigned</span>'; }, csv: function (r) { return r.des; } }, { k: 'st', l: 'Status' },
+      { k: 'daysLeft', l: 'Due', f: function (r) { return r.active ? pill(r.flag, FL(r.flag)) : '<span class="muted">' + esc(r.flag) + '</span>'; }, csv: function (r) { return r.flag; } }, { k: 'due', l: 'Design due', f: function (r) { return fd(r.due); }, csv: function (r) { return Core.dayToISO(r.due); } },
+      { k: 'wp', l: 'WP', n: 1, f: function (r) { return r.wp == null ? '—' : fh(r.wp, 0); } }, { k: 'pf', l: 'Poles done PF', n: 1, f: function (r) { return fh(r.pf, 0); } }, { k: 'gdt', l: 'Poles done GDT', n: 1, f: function (r) { return fh(r.gdt, 0); } },
+      { k: 'hrs', l: 'Hrs charged', n: 1, f: function (r) { return fh(r.hrs); } }, { k: 'est', l: 'Est design hrs', n: 1, f: function (r) { return fh(r.est); } }, { k: 'left', l: 'Hrs left', n: 1, f: function (r) { return '<span class="' + (r.left < 0 ? 'down' : '') + '">' + fh(r.left) + '</span>'; } },
+      { k: 'grp', l: 'Group' }, { k: 'team', l: 'Team' }, { k: 'permits', l: 'Permits', wrap: 1, v: function (r) { return r.permits.join('; '); }, f: function (r) { return r.permits.map(esc).join('<br>'); } }, { k: 'desc', l: 'Description', wrap: 1 }],
+      list, { sort: { k: 'daysLeft', asc: true }, go: function (r) { return 'wo:' + r.wo; }, csv: 'designer-workload', tall: true, limit: 200 }) + '</div></div>';
+  return h;
+}
+
+/* ---- Permits ---- */
+function viewPermits() {
+  var M = App.M; if (!M.ds.permits || !M.ds.permits.length) return needPC();
+  var u = App.ui.pm = App.ui.pm || {}; u.type = u.type || 'FP Number';
+  var R = Ctl.permits(M, { type: u.type, des: u.des || '', grp: u.g == null ? 'all' : grpVal(u.g) });
+  var desOpts = {}; R.all.forEach(function (x) { if (x.des) desOpts[x.des] = 1; });
+  var h = '<div class="head"><div><h2>Permits</h2><p class="sub">Open permits on work orders that are not canceled or sent to construction. A permit\'s state comes from its dates: requested, sent to mapping, acquired, completed.</p></div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('WOs with open permits', R.open.n, '', 'hero') + kpi('Their work points', fh(R.open.wp, 0)) + kpi('HEX Q2 2026 WOs with open permits', R.openHex.n) + kpi('HEX Q2 2026 work points', fh(R.openHex.wp, 0)) + '</div>';
+  h += '<div class="grid2"><div class="panel"><div class="panel-h"><h3>Open permits by type</h3><div class="legend"><span><i style="background:var(--accent);height:10px;width:10px"></i>All projects</span><span><i style="background:var(--copper);height:10px;width:10px"></i>HEX Q2 2026</span></div></div>' +
+    barChart({ labels: R.byType.map(function (t) { return t.type; }), series: [{ name: 'Other projects', color: 'var(--accent)', values: R.byType.map(function (t) { return t.all - t.hex; }) }, { name: 'HEX Q2 2026', color: 'var(--copper)', values: R.byType.map(function (t) { return t.hex; }) }], h: 220 }) +
+    table('pmtype', [{ k: 'type', l: 'Permit type' }, { k: 'all', l: 'Open, all projects', n: 1 }, { k: 'hex', l: 'Open, HEX Q2 2026', n: 1 }], R.byType, { foot: ['Total', String(sum(R.byType, function (t) { return t.all; })), String(sum(R.byType, function (t) { return t.hex; }))] }) + '</div>';
+  var ST = { 'Not Started': '', 'Waiting for Mapping': 'warn', 'Waiting for Permit to be Approved': 'warn', 'In Progress': 'acc', 'Complete': 'good' };
+  h += '<div class="panel"><div class="panel-h"><h3>' + esc(u.type === 'all' ? 'All permit types' : u.type) + '</h3>' + sel('pmT', 'pm.type', [['all', 'All types']].concat(R.types), u.type, 'Permit type') + '</div><div class="kpis">' +
+    kpi('Permit records', R.total) + Object.keys(R.stCounts).map(function (k) { return kpi(k, R.stCounts[k]); }).join('') + kpi('Oldest open request', fd(R.oldest), R.oldestDays == null ? '' : '<span class="down">' + R.oldestDays + ' days open</span>') + '</div></div></div>';
+  h += '<div class="panel"><div class="panel-h"><h3>' + R.detail.length + ' permits, longest-waiting first</h3><div class="row">' + sel('pmD', 'pm.des', [['', 'All designers']].concat(Object.keys(desOpts).sort()), u.des || '', 'Designer') +
+    grpSel('pmG', 'pm.g', u.g == null ? 'all' : u.g) + csvBtn('pmd') + '</div></div>' + table('pmd', [
+      { k: 'wo', l: 'Work order', f: function (r) { return woLink(r.wo) + (u.type === 'all' ? ' <span class="muted">' + esc(r.type) + '</span>' : ''); }, csv: function (r) { return r.wo; } }, { k: 'type', l: 'Type' }, { k: 'des', l: 'Designer' }, { k: 'grp', l: 'Group' },
+      { k: 'wp', l: 'WP', n: 1, f: function (r) { return r.wp == null ? '—' : fh(r.wp, 0); } }, { k: 'req', l: 'Requested', f: function (r) { return fd(r.req); }, csv: function (r) { return Core.dayToISO(r.req); } },
+      { k: 'map', l: 'Sent to mapping', f: function (r) { return fd(r.map); }, csv: function (r) { return Core.dayToISO(r.map); } }, { k: 'acq', l: 'Acquired', f: function (r) { return fd(r.acq); }, csv: function (r) { return Core.dayToISO(r.acq); } },
+      { k: 'done', l: 'Completed', f: function (r) { return fd(r.done); }, csv: function (r) { return Core.dayToISO(r.done); } }, { k: 'woStatus', l: 'WO status' }, { k: 'status', l: 'Permit state', f: function (r) { return pill(r.status, ST[r.status]); }, csv: function (r) { return r.status; } },
+      { k: 'days', l: 'Days open / to complete', n: 1, f: function (r) { return r.days == null ? '—' : '<span class="' + (r.done == null && r.days > 60 ? 'down' : '') + '">' + r.days + '</span>'; } }], R.detail,
+      { csv: 'permits', tall: true, limit: 200, go: function (r) { return 'wo:' + r.wo; } }) + '</div></div>';
+  return h;
+}
+
+/* ---- New Work Incoming ---- */
+function viewNewWork() {
+  var M = App.M; if (!M.ds.newwork) return needPC();
+  var u = App.ui.nw = App.ui.nw || {}; var rows = Ctl.newWork(M), nw = M.S.nw;
+  var list = rows.filter(function (r) { return !u.status || r.status === u.status; });
+  var cnt = {}; rows.forEach(function (r) { cnt[r.status || '(no dates)'] = (cnt[r.status || '(no dates)'] || 0) + 1; });
+  var h = '<div class="head"><div><h2>New work incoming</h2><p class="sub">Work Entergy has sent that may not be in the Project Tracker yet, with a projected schedule: fielding (' + nw.fieldWeeks + ' weeks unless the row says otherwise), then design and QAQC at ' + nw.hpd + ' productive hours a day, after any QAQC backlog. "At Risk" means QAQC ends within ' + nw.riskDays + ' workdays of the due date.</p></div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Incoming WOs', rows.length, fh(sum(rows, function (r) { return r.wp; }), 0) + ' estimated WP', 'hero') + kpi('Design hours needed', fh(sum(rows, function (r) { return r.design; }), 0)) + kpi('QAQC hours needed', fh(sum(rows, function (r) { return r.qaqc; }), 0)) +
+    kpi('Late', '<span class="' + (cnt.Late ? 'down' : '') + '">' + (cnt.Late || 0) + '</span>') + kpi('At risk', cnt['At Risk'] || 0) + kpi('Not in Project Tracker', rows.filter(function (r) { return r.inTracker === false; }).length) + '</div>';
+  h += '<div class="chips">' + '<button class="chip' + (!u.status ? ' on' : '') + '" data-act="nwst" data-v="">All <b>' + rows.length + '</b></button>' + ['Late', 'At Risk', 'On Track'].map(function (s) {
+    var t = s === 'Late' ? 'bad' : s === 'At Risk' ? 'warn' : 'good'; return '<button class="chip' + (u.status === s ? ' on' : '') + '" data-act="nwst" data-v="' + s + '"><span class="dot" style="background:var(--' + t + ')"></span>' + s + ' <b>' + (cnt[s] || 0) + '</b></button>'; }).join('') + '</div>';
+  var STT = { 'Late': 'bad', 'At Risk': 'warn', 'On Track': 'good' };
+  h += '<div class="panel"><div class="panel-h"><h3>Schedule</h3>' + csvBtn('nw') + '</div>' + table('nw', [
+    { k: 'wo', l: 'WO #', f: function (r) { return r.wo ? (r.inTracker ? woLink(r.wo) : '<span class="mono">' + esc(r.wo) + '</span>') : ''; }, csv: function (r) { return r.wo; } }, { k: 'type', l: 'Type' }, { k: 'desc', l: 'Job description', wrap: 1 },
+    { k: 'wp', l: 'Est WP', n: 1, f: function (r) { return r.wp == null ? '—' : fh(r.wp, 0); } }, { k: 'recv', l: 'Received', f: function (r) { return fd(r.recv); }, csv: function (r) { return Core.dayToISO(r.recv); } },
+    { k: 'due', l: 'Due', f: function (r) { return fd(r.due); }, csv: function (r) { return Core.dayToISO(r.due); } }, { k: 'untilDue', l: 'Time to due', n: 1, f: function (r) { return r.untilDue == null ? '—' : r.untilDue < 0 ? '<span class="down">overdue ' + (-r.untilDue) + ' d</span>' : r.untilDue + ' d'; } },
+    { k: 'fe', l: 'Fielding done', f: function (r) { return fd(r.fe); }, csv: function (r) { return Core.dayToISO(r.fe); } }, { k: 'design', l: 'Design hrs', n: 1, f: function (r) { return fh(r.design); } },
+    { k: 'de', l: 'Design done', f: function (r) { return fd(r.de); }, csv: function (r) { return Core.dayToISO(r.de); } }, { k: 'qaqc', l: 'QAQC hrs', n: 1, f: function (r) { return fh(r.qaqc); } },
+    { k: 'backlog', l: 'QAQC backlog (d)', n: 1, f: function (r) { return r.backlog == null ? '—' : r.backlog; } }, { k: 'qe', l: 'QAQC done', f: function (r) { return fd(r.qe); }, csv: function (r) { return Core.dayToISO(r.qe); } },
+    { k: 'status', l: 'Schedule', f: function (r) { return pill(r.status, STT[r.status]); } }, { k: 'inTracker', l: 'In tracker?', v: function (r) { return r.inTracker ? 1 : 0; }, f: function (r) { return r.inTracker == null ? '' : r.inTracker ? 'Yes' : '<span class="flag">No</span>'; }, csv: function (r) { return r.inTracker ? 'Yes' : 'No'; } },
+    { k: 'release', l: 'Forecast release', f: function (r) { return fd(r.release); }, csv: function (r) { return Core.dayToISO(r.release); } }, { k: 'feeder', l: 'Feeder' }, { k: 're', l: 'RE' }, { k: 'reNotes', l: 'RE notes', wrap: 1 }],
+    list, { sort: { k: 'due', asc: true }, csv: 'new-work-incoming', tall: true }) + '<p class="sub" style="margin-top:8px">Add or edit incoming work in the PC Tracker\'s New Work Incoming sheet, then upload it again.</p></div></div>';
+  return h;
+}
+
+/* ---- HEX projects ---- */
+function viewHex() {
+  var M = App.M; if (!M.ds.hex || !Ctl.has(M)) return needPC();
+  var u = App.ui.hx = App.ui.hx || {}; var H = Ctl.hexProjects(M);
+  var list = H.filter(function (r) { return !u.q || (r.name + ' ' + r.des).toLowerCase().indexOf(String(u.q).toLowerCase()) >= 0; });
+  var T = { wos: sum(H, function (r) { return r.wos; }), wp: sum(H, function (r) { return r.wp; }), del: sum(H, function (r) { return r.delivered; }), cost: sum(H, function (r) { return r.cost; }) };
+  var h = '<div class="head"><div><h2>HEX Q2 2026 projects</h2><p class="sub">Work orders grouped by project name (the description before "SECTION" or a section number). Delivered = work points with Entergy status Complete - Sent to Const/Ntwk. Projects over $250,000 need an FP number.</p></div>' +
+    '<div class="row"><label class="f" for="hxQ">Search<input type="search" id="hxQ" data-f="hx.q" value="' + esc(u.q || '') + '" placeholder="Project or designer"></label></div></div>';
+  h += '<div class="stack"><div class="kpis">' + kpi('Projects', H.length) + kpi('Work orders', T.wos) + kpi('Work points', fh(T.wp, 0)) + kpi('Delivered', fh(T.del, 0), pct(T.wp ? T.del / T.wp : null, 0), 'hero') + kpi('Total cost estimate', '$' + fh(T.cost / 1e6, 2) + 'M') +
+    kpi('Need FP number', H.filter(function (r) { return r.fp; }).length, H.filter(function (r) { return r.fp && !/complete|progress/i.test(r.req); }).length + ' not requested yet') + '</div>';
+  h += '<div class="panel"><div class="panel-h"><h3>' + list.length + ' projects</h3>' + csvBtn('hx') + '</div>' + table('hx', [
+    { k: 'name', l: 'Project', wrap: 1 }, { k: 'des', l: 'Designer' }, { k: 'first', l: 'First section WO', f: function (r) { return r.first ? woLink(r.first) : ''; }, csv: function (r) { return r.first; } },
+    { k: 'wos', l: '# WOs', n: 1 }, { k: 'cost', l: 'Cost estimate', n: 1, f: function (r) { return '$' + fh(r.cost, 0); } }, { k: 'wp', l: 'Work points', n: 1, f: function (r) { return fh(r.wp, 0); } }, { k: 'poles', l: 'Poles', n: 1, f: function (r) { return fh(r.poles, 0); } },
+    { k: 'delivered', l: 'Delivered', n: 1, f: function (r) { return fh(r.delivered, 0); } }, { k: 'remaining', l: 'Remaining', n: 1, f: function (r) { return fh(r.remaining, 0); } },
+    { k: 'pct', l: '% complete', f: function (r) { return '<div class="mcell">' + meter(r.pct, 1, { color: r.pct >= 1 ? 'var(--good)' : 'var(--accent)' }) + '<span>' + pct(r.pct, 0) + '</span></div>'; } },
+    { k: 'fp', l: 'FP number?', v: function (r) { return r.fp ? 1 : 0; }, f: function (r) { return r.fp ? pill('Needed', 'warn') : '<span class="muted">No</span>'; }, csv: function (r) { return r.fp ? 'Yes' : 'No'; } },
+    { k: 'req', l: 'Requested?', f: function (r) { return r.req ? pill(r.req.trim(), /complete/i.test(r.req) ? 'good' : /progress/i.test(r.req) ? 'acc' : '') : (r.fp ? '<span class="flag">not yet</span>' : ''); } }], list,
+    { sort: { k: 'remaining', asc: false }, csv: 'hex-projects', tall: true, foot: ['Total', '', '', String(T.wos), '$' + fh(T.cost, 0), fh(T.wp, 0), '', fh(T.del, 0), fh(T.wp - T.del, 0), pct(T.wp ? T.del / T.wp : null, 0), '', ''] }) + '</div></div>';
+  return h;
+}
+
+var VIEW_FN = { status: viewStatus, kpi: viewKPI, timeline: viewTimeline, focus: viewFocus, workload: viewWorkload, permits: viewPermits, newwork: viewNewWork, hex: viewHex, efficiency: viewEfficiency, workorders: viewWorkOrders, designers: viewDesigners, qc: viewQC, production: viewProduction, tasks: viewTasks, estimator: viewEstimator, data: viewData, settings: viewSettings };
 
 /* ---------------- events ---------------- */
 function setPath(path, val) { var p = path.split('.'); App.ui[p[0]] = App.ui[p[0]] || {}; App.ui[p[0]][p[1]] = val; }
 function go(view) { if (location.hash !== '#' + view) location.hash = view; else { App.view = view; render.nav = true; render(); } window.scrollTo(0, 0); }
 document.addEventListener('click', function (e) {
+  var sb = e.target.closest('[data-sec]');
+  if (sb) { App.section = sb.getAttribute('data-sec'); var first = VIEWS.filter(function (v) { return v[2] === App.section; })[0]; if (first) go(first[0]); return; }
+  var ws = e.target.closest('[data-wost]');
+  if (ws) { e.preventDefault(); App.ui.wo = { st: ws.getAttribute('data-wost'), logged: 'all' }; go('workorders'); return; }
   var t = e.target.closest('[data-des],[data-wo],[data-go],[data-sort],[data-act]'); if (!t) return;
   if (t.hasAttribute('data-des')) { e.preventDefault(); App.ui.des.name = t.getAttribute('data-des'); go('designers'); return; }
   if (t.hasAttribute('data-wo') && !t.hasAttribute('data-act')) { e.preventDefault(); App.ui.wo.sel = t.getAttribute('data-wo'); App.ui.wo.person = ''; go('workorders'); return; }
@@ -1363,6 +2015,7 @@ document.addEventListener('click', function (e) {
   else if (act === 'csv') exportCSV(t.getAttribute('data-id'));
   else if (act === 'more') { App.ui['more_' + t.getAttribute('data-id')] = true; render(); }
   else if (act === 'bud') { App.ui.wo.bud = t.getAttribute('data-v'); render(); }
+  else if (act === 'nwst') { App.ui.nw.status = t.getAttribute('data-v'); render(); }
   else if (act === 'woBack') { e.preventDefault(); App.ui.wo.sel = null; render.nav = true; render(); window.scrollTo(0, 0); }
   else if (act === 'toEst') { App.ui.est.wo = t.getAttribute('data-wo'); var o = App.M.woMap[App.ui.est.wo]; if (o) App.ui.est.wp = o.wp; go('estimator'); }
   else if (act === 'kwApply') { App.ui.tasks.kw = $('#kwList').value.split('\n').map(function (s) { return s.trim(); }).filter(Boolean); render(); }
@@ -1378,7 +2031,7 @@ document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.t
 var typingTimer;
 function onField(e) {
   var t = e.target, f = t.getAttribute && t.getAttribute('data-f'); if (!f) return;
-  var v = t.value;
+  var v = t.type === 'checkbox' ? t.checked : t.value;
   if (f === 'tasks.kwtext') return;
   if (f === 'eff.week' || f === 'prod.week' || f === 'eff.span') v = +v;
   setPath(f, v);
@@ -1387,10 +2040,10 @@ function onField(e) {
   if (f === 'est.wo') { var o = App.M.woMap[String(v).trim()]; if (o && o.wp != null) App.ui.est.wp = o.wp; }
   if (f === 'est.skip') App.ui.est.skip = v === 'true';
   if (f.indexOf('wo.') === 0) App.ui.more_wo = false;
-  if (e.type === 'input' && t.tagName === 'INPUT') { clearTimeout(typingTimer); typingTimer = setTimeout(render, 220); } else render();
+  if (e.type === 'input' && t.tagName === 'INPUT') { clearTimeout(typingTimer); typingTimer = setTimeout(render, 220); } else { clearTimeout(typingTimer); render(); }
 }
-document.addEventListener('change', function (e) { if (e.target.tagName === 'SELECT' || e.target.type === 'date') onField(e); else if (e.target.tagName === 'INPUT') onField(e); });
-document.addEventListener('input', function (e) { if (e.target.tagName === 'INPUT' && (e.target.type === 'search' || e.target.type === 'number')) onField(e); });
+document.addEventListener('change', function (e) { if (e.target.closest && e.target.closest('#lookupWrap,#finder')) return; if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT') onField(e); });
+document.addEventListener('input', function (e) { if (e.target.id === 'woFind') return; if (e.target.tagName === 'INPUT' && (e.target.type === 'search' || e.target.type === 'number')) onField(e); });
 window.addEventListener('hashchange', function () { var v = location.hash.slice(1); if (VIEW_FN[v]) { App.view = v; lsSet('view', v); render.nav = true; render(); window.scrollTo(0, 0); } });
 $('#uploadBtn').addEventListener('click', function () { pickFile(); });
 $('#refreshBtn').addEventListener('click', function () { refreshFile(); });
@@ -1417,7 +2070,7 @@ function renderLookup() {
   var r = Core.woHours(M, L.wo, hasRoll && L.roll), own = hasRoll ? Core.woHours(M, L.wo, false) : r;
   if (!r.entries && !o) { wrap.hidden = false; $('#lookup').innerHTML = '<div class="lk-top"><div><h3 class="mono">WO ' + esc(L.wo) + '</h3><p class="sub">No time has been charged to this work order in the loaded workbook.</p></div><button class="btn" data-act="lkClose" type="button">Close</button></div>'; return; }
   var bw = r.tot ? r.b / r.tot * 100 : 0, nw = r.tot ? r.n / r.tot * 100 : 0, xw = r.tot ? r.x / r.tot * 100 : 0;
-  var h = '<div class="lk-top"><div><h3 class="mono">WO ' + esc(L.wo) + '</h3><p class="sub">' + esc(o ? [o.desc, o.des, o.st].filter(Boolean).join(' · ') : (L.wo === Core.OH ? 'Overhead' : L.wo === Core.TR ? 'Training' : '')) +
+  var h = '<div class="lk-top"><div><h3 class="mono">WO ' + esc(L.wo) + '</h3><p class="sub">' + esc(o ? [o.desc, o.des, o.st, o.ent ? 'Entergy: ' + o.ent : ''].filter(Boolean).join(' · ') : (L.wo === Core.OH ? 'Overhead' : L.wo === Core.TR ? 'Training' : '')) +
     (r.first != null ? ' · charged ' + fd(r.first) + ' – ' + fd(r.last) : '') + '</p></div><div class="row">' +
     (o ? '<button class="btn" data-act="lkOpen" type="button">Full details</button>' : '') + '<button class="btn" data-act="lkClose" type="button">Close</button></div></div>';
   if (hasRoll) h += '<label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-bottom:10px"><input type="checkbox" id="lkRoll"' + (L.roll ? ' checked' : '') + '> Include earlier WO number' + (o.set.length > 2 ? 's' : '') + ' (' + o.set.slice(1).map(esc).join(', ') + ')</label>';
@@ -1448,25 +2101,27 @@ $('#lookupWrap').addEventListener('change', function (e) { if (e.target.id === '
 
 /* ---------------- picking and refreshing the workbook file ---------------- */
 var canPick = typeof window.showOpenFilePicker === 'function';
-var PICK_OPTS = { types: [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm'], 'application/vnd.ms-excel.sheet.binary.macroEnabled.12': ['.xlsb'] } }], multiple: false };
-function handleGet() { return idb('readonly', function (st) { return st.get('handle'); }); }
-function handleSet(h) { return idb('readwrite', function (st) { st.put(h, 'handle'); }); }
+var PICK_OPTS = { types: [{ description: 'Excel workbook', accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel.sheet.macroEnabled.12': ['.xlsm'], 'application/vnd.ms-excel.sheet.binary.macroEnabled.12': ['.xlsb'] } }], multiple: true };
+// remembered file handles, one per workbook name, so Refresh can re-read both
+function handleGet() { return idb('readonly', function (st) { return st.get('handles'); }).then(function (h) { return h || {}; }); }
+function handleSet(hs) { return handleGet().then(function (all) { hs.forEach(function (h) { all[h.name] = h; }); return idb('readwrite', function (st) { st.put(all, 'handles'); }); }); }
 function pickFile() {
   if (!canPick) { $('#file').click(); return; }
-  window.showOpenFilePicker(PICK_OPTS).then(function (hs) { var h = hs[0]; handleSet(h); return h.getFile(); }).then(function (f) { handleFile(f); })
+  window.showOpenFilePicker(PICK_OPTS).then(function (hs) { handleSet(hs); return Promise.all(hs.map(function (h) { return h.getFile(); })); }).then(function (fs) { handleFiles(fs); })
     .catch(function (e) { if (e && e.name === 'AbortError') return; canPick = false; $('#file').click(); });
 }
 function refreshFile() {
   if (!canPick) { toast('Pick the saved workbook again to reload it.', 4000); $('#file').click(); return; }
-  handleGet().then(function (h) {
-    if (!h) { toast('Pick the workbook once; after that Refresh re-reads it with one click.', 5000); pickFile(); return; }
-    var perm = h.queryPermission ? h.queryPermission({ mode: 'read' }) : Promise.resolve('granted');
-    return perm.then(function (p) { return p === 'granted' ? p : h.requestPermission({ mode: 'read' }); }).then(function (p) {
-      if (p !== 'granted') { toast('The browser needs permission to read the workbook. Click Refresh again and choose Allow.', 6000); return; }
-      return h.getFile().then(function (f) {
-        var prev = App.meta && App.meta.lastModified;
-        if (prev && f.lastModified === prev) { toast('No changes since the last load. In Excel: Data → Refresh All, wait for it to finish, then Save. Then click Refresh here.', 8000); return; }
-        handleFile(f);
+  handleGet().then(function (all) {
+    var hs = Object.keys(all).map(function (k) { return all[k]; });
+    if (!hs.length) { toast('Pick the workbook(s) once; after that Refresh re-reads them with one click.', 5000); pickFile(); return; }
+    return hs.reduce(function (p, h) { return p.then(function (ok) { var q = h.queryPermission ? h.queryPermission({ mode: 'read' }) : Promise.resolve('granted'); return q.then(function (s) { return s === 'granted' ? s : h.requestPermission({ mode: 'read' }); }).then(function (s) { return ok && s === 'granted'; }); }); }, Promise.resolve(true)).then(function (ok) {
+      if (!ok) { toast('The browser needs permission to read the workbooks. Click Refresh again and choose Allow.', 6000); return; }
+      return Promise.all(hs.map(function (h) { return h.getFile(); })).then(function (fs) {
+        var prev = (App.meta && App.meta.lastModified) || {};
+        var changed = fs.filter(function (f) { return typeof prev !== 'object' || prev[f.name] !== f.lastModified; });
+        if (!changed.length) { toast('No changes since the last load. In Excel: Data → Refresh All, wait for it to finish, then Save. Then click Refresh here.', 8000); return; }
+        handleFiles(changed);
       });
     });
   }).catch(function (e) {
@@ -1475,7 +2130,7 @@ function refreshFile() {
     if (e && e.name === 'NotFoundError') pickFile();
   });
 }
-$('#file').addEventListener('change', function () { var f = this.files[0]; this.value = ''; if (f) handleFile(f); });
+$('#file').addEventListener('change', function () { var fs = Array.prototype.slice.call(this.files || []); this.value = ''; if (fs.length) handleFiles(fs); });
 
 /* ---------------- data loading, sharing, caching ---------------- */
 function idb(mode, fn) {
@@ -1496,25 +2151,35 @@ function resolveUploader() {
   var m = App.meta; if (!m || !m.uploadedBy || !App.caps.user || m.uploaderName) return;
   try { App.caps.user.profiles([m.uploadedBy]).then(function (ps) { var p = ps && ps[m.uploadedBy]; if (p && p.name && App.meta === m) { m.uploaderName = p.name; renderInfo(); } }).catch(function () {}); } catch (e) {}
 }
-function handleFile(file) {
+function handleFile(file) { handleFiles([file]); }
+function readBuf(file) { return new Promise(function (res, rej) { var fr = new FileReader(); fr.onload = function () { res(new Uint8Array(fr.result)); }; fr.onerror = function () { rej(new Error('Could not open ' + file.name)); }; fr.readAsArrayBuffer(file); }); }
+function handleFiles(files) {
   if (typeof XLSX === 'undefined') { toast('The spreadsheet reader did not load. Check your connection and reload.'); return; }
-  toast('Reading ' + file.name + '…', 60000);
-  var fr = new FileReader();
-  fr.onload = function () {
-    setTimeout(function () {
-      var ds;
-      try { ds = Core.parseWorkbook(XLSX, new Uint8Array(fr.result), file.name); }
-      catch (e) { console.error(e); toast(e.message || 'That file could not be read as a workbook.', 8000); return; }
-      var meta = { fileName: file.name, lastModified: file.lastModified || null, uploadedAt: new Date().toISOString(), uploadedBy: App.uid || null, local: true, maxDay: ds.counts.maxDay, entries: ds.counts.entries };
+  files = Array.prototype.slice.call(files || []); if (!files.length) return;
+  toast('Reading ' + files.map(function (f) { return f.name; }).join(' and ') + '…', 60000);
+  var merged = App.ds, done = [], lm = {};
+  files.reduce(function (p, file) {
+    return p.then(function () { return readBuf(file); }).then(function (buf) {
+      return new Promise(function (res) { setTimeout(function () {
+        try { var part = Core.parseWorkbook(XLSX, buf, file.name); merged = Core.mergeDatasets(merged && merged.pt ? merged : null, part); done.push(file.name); lm[file.name] = file.lastModified || null; }
+        catch (e) { console.error(e); toast(file.name + ': ' + (e.message || 'could not be read as a workbook.'), 8000); }
+        res();
+      }, 20); });
+    });
+  }, Promise.resolve()).then(function () {
+    if (!done.length) return;
+    var ds = merged;
+    (function () {
+      var file = { name: done.join(' + ') };
+      var meta = { fileName: ds.file || file.name, lastModified: lm, uploadedAt: new Date().toISOString(), uploadedBy: App.uid || null, local: true, maxDay: ds.counts.maxDay, entries: ds.counts.entries };
       var before = App.ds ? App.ds.counts : null;
       useDataset(ds, meta);
       cacheSet({ ds: ds, meta: meta });
-      if (before && (!App.caps.assets || !App.canEdit)) { var add = ds.counts.entries - before.entries; toast('Refreshed. ' + (add > 0 ? add.toLocaleString() + ' new entries · ' : add < 0 ? Math.abs(add).toLocaleString() + ' fewer entries · ' : 'Same number of entries · ') + 'time logged through ' + fd(ds.counts.maxDay) + '.', 6000); return; }
+      if (before && (!App.caps.assets || !App.canEdit)) { var add = ds.counts.entries - before.entries; toast('Loaded ' + done.join(' and ') + '. ' + (add > 0 ? add.toLocaleString() + ' new time entries · ' : '') + 'time logged through ' + fd(ds.counts.maxDay) + '.', 6000); return; }
+      if (ds.warn && ds.warn.length) setTimeout(function () { toast(ds.warn.join(' '), 7000); }, 6500);
       shareDataset(ds, meta);
-    }, 30);
-  };
-  fr.onerror = function () { toast('That file could not be opened.'); };
-  fr.readAsArrayBuffer(file);
+    })();
+  });
 }
 function shareDataset(ds, meta) {
   var A = App.caps.assets, db = App.caps.db;
